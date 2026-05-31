@@ -1,0 +1,82 @@
+# Shashka Game - Apache Configuration
+# Works at domain root AND in a subdirectory (e.g. /shashka/)
+# Entry point lives in public/, this .htaccess sits at the project root.
+
+RewriteEngine On
+
+# ---------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ---------------------------------------------------------------
+# Compression
+# ---------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain text/html text/xml text/css
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------
+# Browser caching for static assets (1 year)
+# ---------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# ---------------------------------------------------------------
+# Block access to sensitive files and directories
+# (RewriteRule based so it works inside subdirectories too)
+# ---------------------------------------------------------------
+RewriteRule (^|/)\.(env|git|htaccess)(/|$) - [F,L]
+RewriteRule (^|/)(config|core|models|controllers|views|storage|database|cron|tests)(/|$) - [F,L]
+RewriteRule \.(log|sql)$ - [F,L]
+
+# ---------------------------------------------------------------
+# Map static asset URLs to the public/ directory
+#   /shashka/css/app.min.css  ->  public/css/app.min.css
+# ---------------------------------------------------------------
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(css|js|images|uploads)/(.*)$ public/$1/$2 [L]
+
+# Serve existing files in public/ directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ---------------------------------------------------------------
+# Front controller: everything else goes to public/index.php
+# The captured path is passed as ?route= (no subdirectory prefix,
+# because .htaccess matches relative to its own directory).
+# ---------------------------------------------------------------
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/index.php?route=$1 [QSA,L]
+
+# ---------------------------------------------------------------
+# PHP runtime settings (PHP 7.x / 8.x)
+# ---------------------------------------------------------------
+<IfModule mod_php7.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value memory_limit 256M
+    php_value upload_max_filesize 5M
+    php_value post_max_size 10M
+</IfModule>
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value memory_limit 256M
+</IfModule>
