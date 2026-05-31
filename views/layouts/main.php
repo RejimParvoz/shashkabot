@@ -4,7 +4,18 @@
  * Variables available: $currentPage, optional page-specific data
  */
 $currentPage = isset($currentPage) ? $currentPage : 'home';
-$version = '1.0.0';
+$version = '1.0.1';
+
+// Detect base path (subdirectory) so assets and API calls work under /shashka/
+$scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+$basePath = str_replace('\\', '/', dirname($scriptName));
+if (substr($basePath, -7) === '/public') {
+    $basePath = substr($basePath, 0, -7);
+}
+$basePath = rtrim($basePath, '/');
+if ($basePath === '.' ) { $basePath = ''; }
+// e.g. "/shashka" or "" for root
+$assetBase = $basePath; // assets are mapped to public/ by .htaccess
 ?>
 <!DOCTYPE html>
 <html lang="uz">
@@ -13,8 +24,12 @@ $version = '1.0.0';
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#007aff">
     <title>Shashka Game</title>
+    <script>
+        // Base path for API calls, WebSocket and assets (subdirectory-aware)
+        window.APP_BASE = <?php echo json_encode($basePath); ?>;
+    </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/css/app.min.css?v=<?php echo $version; ?>">
+    <link rel="stylesheet" href="<?php echo $assetBase; ?>/css/app.min.css?v=<?php echo $version; ?>">
 </head>
 <body>
     <!-- Loading screen -->
@@ -27,7 +42,7 @@ $version = '1.0.0';
     <!-- Header -->
     <header class="app-header">
         <div class="row gap-8">
-            <img id="userAvatar" class="avatar" src="/images/default-avatar.png" alt="avatar">
+            <img id="userAvatar" class="avatar" src="<?php echo $assetBase; ?>/images/default-avatar.png" alt="avatar">
             <div>
                 <div id="userName" style="font-weight:600;">Mehmon</div>
                 <div class="caption">Reyting: <span id="userRating">1000</span></div>
@@ -80,8 +95,8 @@ $version = '1.0.0';
     <div class="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="/js/app.min.js?v=<?php echo $version; ?>"></script>
-    <script src="/js/board.min.js?v=<?php echo $version; ?>"></script>
-    <script src="/js/game.min.js?v=<?php echo $version; ?>"></script>
+    <script src="<?php echo $assetBase; ?>/js/app.min.js?v=<?php echo $version; ?>"></script>
+    <script src="<?php echo $assetBase; ?>/js/board.min.js?v=<?php echo $version; ?>"></script>
+    <script src="<?php echo $assetBase; ?>/js/game.min.js?v=<?php echo $version; ?>"></script>
 </body>
 </html>

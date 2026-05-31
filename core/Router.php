@@ -119,16 +119,20 @@ class Router {
     }
     
     /**
-     * Convert route path to regex pattern
+     * Convert route path to regex pattern.
+     * Uses '#' as the delimiter so that '/' inside [^/]+ does not clash.
      */
     private function convertToRegex($path) {
-        // Escape special regex characters except {}
-        $pattern = preg_quote($path, '/');
-        
-        // Replace parameter placeholders {param} with named capture groups
-        $pattern = preg_replace('/\\\\{([^}]+)\\\\}/', '(?P<$1>[^/]+)', $pattern);
-        
-        return '/^' . $pattern . '$/';
+        // Protect {param} placeholders before escaping
+        $pattern = preg_replace('#\{([a-zA-Z0-9_]+)\}#', '___PARAM_$1___', $path);
+
+        // Escape regex special characters (delimiter '#', so '/' is left intact)
+        $pattern = preg_quote($pattern, '#');
+
+        // Restore placeholders as named capture groups
+        $pattern = preg_replace('#___PARAM_([a-zA-Z0-9_]+)___#', '(?P<$1>[^/]+)', $pattern);
+
+        return '#^' . $pattern . '$#';
     }
     
     /**
@@ -162,22 +166,54 @@ class Router {
     }
     
     /**
-     * Get current URI
+     * Get current URI (subdirectory-aware).
+     *
+     * Works in three setups:
+     *   1. Apache .htaccess passing ?route=...  (preferred)
+     *   2. Nginx try_files passing ?route=...
+     *   3. Plain REQUEST_URI under a subdirectory (e.g. /shashka/api/...)
      */
     private function getCurrentUri() {
+        // 1 & 2. Front controller passed the relative route explicitly
+        if (isset($_GET['route'])) {
+            $route = '/' . ltrim($_GET['route'], '/');
+            return $route === '' ? '/' : $route;
+        }
+
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        
+
         // Remove query string
         if (($pos = strpos($uri, '?')) !== false) {
             $uri = substr($uri, 0, $pos);
         }
-        
-        // Handle route parameter from .htaccess
-        if (isset($_GET['route'])) {
-            $uri = '/' . ltrim($_GET['route'], '/');
+
+        // 3. Strip the base path (subdirectory) derived from the script location.
+        // e.g. SCRIPT_NAME = /shashka/public/index.php  ->  base = /shashka
+        $basePath = $this->getBasePath();
+        if ($basePath !== '' && strpos($uri, $basePath) === 0) {
+            $uri = substr($uri, strlen($basePath));
         }
-        
+
+        $uri = '/' . ltrim($uri, '/');
         return $uri === '' ? '/' : $uri;
+    }
+
+    /**
+     * Determine the application base path (subdirectory) from SCRIPT_NAME.
+     * Removes a trailing "/public" so routes are matched without it.
+     */
+    private function getBasePath() {
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        $base = str_replace('\\', '/', dirname($scriptName));
+
+        // Strip trailing /public (entry point lives in public/)
+        if (substr($base, -7) === '/public') {
+            $base = substr($base, 0, -7);
+        }
+
+        $base = rtrim($base, '/');
+        // Root install -> empty base
+        return ($base === '' || $base === '.') ? '' : $base;
     }
     
     /**
