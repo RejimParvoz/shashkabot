@@ -43,23 +43,22 @@ oddiy hostingda muammosiz ishlaydi.
 
 ## ✅ Nima ishlaydi
 
-- **Telegram avto-login** — Mini App ochilganda initData HMAC tekshiruvi bilan
-  avtomatik kirish (parol kerak emas).
-- **To'g'ri o'zbek/rus shashka qoidalari:**
-  - Oddiy tosh **oldinga VA orqaga** yutadi (orqaga olish) ✅
-  - **Dama uchuvchi** — diagonal bo'ylab istalgan masofaga yuradi va yutadi ✅
-  - Majburiy yutish, ko'p sakrash (zanjir), damaga aylanish
-- **Bot bilan o'ynash** — 4 daraja (Oson/O'rta/Qiyin/Ekspert), Minimax+Alpha-Beta AI.
-- **🌐 Online o'ynash** — boshqa o'yinchilar bilan (server tomon tekshiruvli, polling).
-- **🏪 Do'kon (faqat tanga)** — 5 doska + 5 tosh terilari, sotib olish va tanlash.
-- **🎁 Do'st taklif qilish** — Telegram share havolasi; taklif qilgan +200🪙, yangi +100🪙.
-- **Elo reyting** — bot va online uchun, **Tangalar**, **Reyting jadvali**, **Profil**.
-- **To'liq iOS style** — glassmorphism, segment control, blur, dark/light tema.
+- **Telegram avto-login** — initData HMAC tekshiruvi bilan avtomatik kirish.
+- **To'g'ri o'zbek/rus shashka qoidalari** — orqaga olish + uchuvchi dama, majburiy yutish, zanjir.
+- **Bot bilan o'ynash** — 4 daraja, Minimax+Alpha-Beta AI.
+- **🌐 Online o'ynash** — tasodifiy raqib (server tomon tekshiruvli).
+- **👥 Do'st bilan 1v1** — havola/kod yarating, do'stga yuboring; u kirsa o'yin boshlanadi.
+- **🏪 Do'kon** — tanga terilari + **💎 premium (olmos) skinlar** (marmar, galaktika, olmos, yoqut, shohona...).
+- **💎 Olmos sotib olish** — Telegram Stars orqali (5 paket).
+- **🎟 Battle Pass** — 10 daraja, free + premium track, XP (o'yin +10, g'alaba +25), mukofotlar.
+- **🏆 Reyting + podium** — 1-o'rin markazda, 2-chapda, 3-o'ngda; o'yinchi ustiga bossangiz to'liq statistika.
+- **🎁 Do'st taklif (referral)** — botga havola; taklif qilgan +200🪙, yangi +100🪙.
+- **To'liq iOS style** — glassmorphism, segment, blur, dark/light.
 
-## 🧪 Testlar (jami 47)
+## 🧪 Testlar (47)
 
 ```bash
-php lite/test_auth.php          # avto-login (12 test)
-php lite/test_engine_php.php    # server dvigatel (15 test)
-node lite/test_engine.js        # klient dvigatel (20 test)
+php lite/test_auth.php          # 12
+php lite/test_engine_php.php    # 15
+node lite/test_engine.js        # 20
 ```

@@ -63,6 +63,7 @@ function nav(page) {
   if (page === 'top') loadLeaderboard();
   if (page === 'profile') loadProfile();
   if (page === 'shop') loadShop();
+  if (page === 'bp') loadBP();
 }
 
 function toast(msg) {
@@ -90,6 +91,8 @@ function renderUser() {
   document.getElementById('uName').textContent = USER.first_name || 'Mehmon';
   document.getElementById('uRating').textContent = USER.rating;
   document.getElementById('uCoins').textContent = USER.coins;
+  var dEl = document.getElementById('uDiamonds');
+  if (dEl) dEl.textContent = USER.diamonds || 0;
   if (USER.photo_url) {
     document.getElementById('uAvatar').src = USER.photo_url;
     document.getElementById('pAvatar').src = USER.photo_url;
@@ -107,6 +110,11 @@ function init() {
     if (res.success) {
       USER = res.user;
       renderUser();
+      var code = (typeof JOIN_CODE !== 'undefined' && JOIN_CODE) ? JOIN_CODE : '';
+      if (!code && START_PARAM && START_PARAM.indexOf('match_') === 0) {
+        code = START_PARAM.substring(6);
+      }
+      if (code) { setTimeout(function () { joinByCode(code); }, 300); }
     } else {
       toast('Avtorizatsiya: ' + (res.error || 'xato'));
     }
@@ -142,15 +150,62 @@ function loadProfile() {
 function loadLeaderboard() {
   fetch(API + '?action=leaderboard').then(function (r) { return r.json(); }).then(function (res) {
     if (!res.success) return;
+    var lb = res.leaderboard;
+    // Podium (top 3): 2 chapda, 1 markazda(baland), 3 o'ngda
+    var podium = document.getElementById('podium');
+    podium.innerHTML = '';
+    var order = [{ i: 1, c: 'pod2' }, { i: 0, c: 'pod1' }, { i: 2, c: 'pod3' }];
+    order.forEach(function (o) {
+      var u = lb[o.i];
+      if (!u) return;
+      var av = u.photo_url || '';
+      podium.innerHTML +=
+        '<div class="pod ' + o.c + '" onclick="showUserStats(' + u.telegram_id + ')">' +
+        '<img class="av" src="' + av + '" onerror="this.style.visibility=\'hidden\'">' +
+        '<div class="nm">' + escapeHtml(u.first_name || u.username || 'Player') + '</div>' +
+        '<div class="rt">⭐' + u.rating + '</div>' +
+        '<div class="base">' + (o.i + 1) + '</div></div>';
+    });
+
+    // Qolganlari (4+)
     var html = '';
-    res.leaderboard.forEach(function (u) {
-      var cls = u.rank === 1 ? 'g1' : (u.rank === 2 ? 'g2' : (u.rank === 3 ? 'g3' : ''));
-      html += '<div class="lb"><div class="r ' + cls + '">' + u.rank + '</div>' +
+    lb.forEach(function (u, idx) {
+      if (idx < 3) return;
+      html += '<div class="lb" onclick="showUserStats(' + u.telegram_id + ')">' +
+        '<div class="r">' + u.rank + '</div>' +
         '<div class="nm">' + escapeHtml(u.first_name || u.username || 'Player') + '</div>' +
         '<div class="rt">' + u.rating + '</div></div>';
     });
-    document.getElementById('lbList').innerHTML = html || '<div class="muted" style="padding:16px;">Hozircha bosh</div>';
+    document.getElementById('lbList').innerHTML = html;
   });
+}
+
+/* O'yinchi statistikasi modali */
+function showUserStats(tgid) {
+  api('user_stats', { telegram_id: tgid }).then(function (res) {
+    if (!res.success) { toast('Topilmadi'); return; }
+    var p = res.profile;
+    var av = p.photo_url || '';
+    var html =
+      '<img class="avatar" style="width:80px;height:80px;margin:0 auto 10px;" src="' + av + '" onerror="this.style.visibility=\'hidden\'">' +
+      '<h2 style="padding:0;">' + escapeHtml(p.first_name || 'Player') + '</h2>' +
+      '<div class="muted" style="margin-bottom:14px;">⭐ ' + p.rating + ' • #' + p.rank + '</div>' +
+      '<div style="text-align:left;">' +
+      statRow('🎮 O\'yinlar', p.total_games) +
+      statRow('✅ G\'alaba', p.wins) +
+      statRow('❌ Mag\'lubiyat', p.losses) +
+      statRow('🤝 Durang', p.draws) +
+      statRow('📊 G\'alaba %', p.win_rate + '%') +
+      statRow('🎟 BP daraja', p.bp_level) +
+      '</div>' +
+      '<button class="btn grad" style="margin-top:16px;" onclick="closeResult()">Yopish</button>';
+    document.getElementById('resultCard').innerHTML = html;
+    document.getElementById('ov').classList.add('show');
+  });
+}
+
+function statRow(label, val) {
+  return '<div class="stat"><span>' + label + '</span><b>' + val + '</b></div>';
 }
 
 function escapeHtml(s) {
@@ -774,7 +829,7 @@ function loadShop() {
   api('shop_list', {}).then(function (res) {
     if (!res.success) { return; }
     SHOP_ITEMS = res.items;
-    if (USER) { USER.coins = res.coins; renderUser(); }
+    if (USER) { USER.coins = res.coins; USER.diamonds = res.diamonds; renderUser(); }
     renderShop();
   });
 }
@@ -788,7 +843,12 @@ function shopTab(t, el) {
 
 function renderShop() {
   var grid = document.getElementById('shopGrid');
-  var items = SHOP_ITEMS.filter(function (it) { return it.type === SHOP_TAB; });
+  if (SHOP_TAB === 'diamonds') { renderDiamondPacks(grid); return; }
+
+  var items = SHOP_ITEMS.filter(function (it) {
+    if (SHOP_TAB === 'premium') return it.premium === 1;
+    return it.type === SHOP_TAB && it.premium !== 1;
+  });
   if (!items.length) { grid.innerHTML = '<div class="muted" style="padding:16px;">Bo\'sh</div>'; return; }
   grid.innerHTML = items.map(function (it) {
     return '<div class="shop-item">' +
@@ -806,7 +866,6 @@ function shopPreview(it) {
     return '<div class="shop-prev" style="background:repeating-conic-gradient(#' + d[0] +
       ' 0% 25%, #' + d[1] + ' 0% 50%);background-size:34px 34px;"></div>';
   }
-  // piece: oq va qora doira
   return '<div class="shop-prev" style="background:var(--bg);gap:8px;">' +
     '<span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#' + d[0] + ',#' + d[1] + ');display:inline-block;"></span>' +
     '<span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#' + d[2] + ',#' + d[3] + ');display:inline-block;"></span>' +
@@ -816,14 +875,16 @@ function shopPreview(it) {
 function shopBtn(it) {
   if (it.equipped) return '<button class="btn sm sec" disabled style="width:100%;">✓ Tanlangan</button>';
   if (it.owned) return '<button class="btn sm" style="width:100%;" onclick="equipItem(\'' + it.code + '\')">Tanlash</button>';
-  return '<button class="btn sm gold" style="width:100%;" onclick="buyItem(\'' + it.code + '\',' + it.price_coins + ')">' + it.price_coins + ' 🪙</button>';
+  if (it.price_diamonds > 0) {
+    return '<button class="btn sm grad" style="width:100%;" onclick="buyItem(\'' + it.code + '\')">' + it.price_diamonds + ' 💎</button>';
+  }
+  return '<button class="btn sm gold" style="width:100%;" onclick="buyItem(\'' + it.code + '\')">' + it.price_coins + ' 🪙</button>';
 }
 
-function buyItem(code, price) {
-  if (USER && USER.coins < price) { toast('Tanga yetarli emas'); return; }
+function buyItem(code) {
   api('shop_buy', { code: code }).then(function (res) {
     if (!res.success) { toast(res.error || 'Xato'); return; }
-    USER.coins = res.coins;
+    USER.coins = res.coins; USER.diamonds = res.diamonds;
     renderUser();
     toast('Sotib olindi! Endi tanlang.');
     loadShop();
@@ -833,7 +894,6 @@ function buyItem(code, price) {
 function equipItem(code) {
   api('shop_equip', { code: code }).then(function (res) {
     if (!res.success) { toast(res.error || 'Xato'); return; }
-    // mahalliy holatni yangilash
     var it = SHOP_ITEMS.find(function (x) { return x.code === code; });
     if (it) {
       if (it.type === 'board') USER.equipped_board = code;
@@ -844,27 +904,159 @@ function equipItem(code) {
   });
 }
 
-/* ==================== DO'ST TAKLIF QILISH ==================== */
+/* ---------- Olmos sotib olish (Telegram Stars) ---------- */
+function renderDiamondPacks(grid) {
+  grid.innerHTML = '<div class="muted" style="padding:16px;">Yuklanmoqda...</div>';
+  fetch(API + '?action=diamond_packs', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ init_data: INIT_DATA })
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    if (!res.success) { grid.innerHTML = '<div class="muted" style="padding:16px;">Xato</div>'; return; }
+    grid.innerHTML = res.packs.map(function (p) {
+      return '<div class="shop-item"><div class="shop-prev" style="font-size:34px;">💎</div>' +
+        '<div class="nm">' + p.diamonds + ' olmos</div>' +
+        '<button class="btn sm grad" style="width:100%;" onclick="buyDiamonds(\'' + p.id + '\')">' + p.stars + ' ⭐</button></div>';
+    }).join('');
+  });
+}
+
+function buyDiamonds(pack) {
+  api('buy_diamonds', { pack: pack }).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    if (tg && tg.openInvoice) {
+      tg.openInvoice(res.invoice, function (status) {
+        if (status === 'paid') { toast('To\'lov qabul qilindi! 💎'); setTimeout(function () { api('auth', {}).then(function (a) { if (a.success) { USER = a.user; renderUser(); loadShop(); } }); }, 1500); }
+      });
+    } else { toast('Telegram orqali oching'); }
+  });
+}
+
+/* ==================== BATTLE PASS ==================== */
+function loadBP() {
+  api('bp_state', {}).then(function (res) {
+    if (!res.success) { return; }
+    if (USER) { USER.coins = res.coins; USER.diamonds = res.diamonds; USER.bp_premium = res.premium; renderUser(); }
+    document.getElementById('bpLevelTxt').textContent = 'Daraja ' + res.level;
+    document.getElementById('bpXpTxt').textContent = res.xp + ' XP';
+    document.getElementById('bpPremBtn').style.display = res.premium ? 'none' : 'block';
+    // progress: keyingi darajagacha
+    var levels = res.levels;
+    var nextXp = levels.length ? levels[levels.length - 1].xp_required : 100;
+    for (var i = 0; i < levels.length; i++) { if (levels[i].level === res.level + 1) { nextXp = levels[i].xp_required; break; } }
+    var pct = Math.min(100, Math.round(res.xp / nextXp * 100));
+    document.getElementById('bpFill').style.width = pct + '%';
+
+    document.getElementById('bpLevels').innerHTML = levels.map(function (l) {
+      var lockCls = l.unlocked ? '' : ' lock';
+      var free = bpReward(l.free_coins, l.free_diamonds, null, l.claimed_free, l.unlocked, l.level, 'free');
+      var prem = bpReward(l.prem_coins, l.prem_diamonds, l.prem_item, l.claimed_prem, l.unlocked && res.premium, l.level, 'prem');
+      return '<div class="bp-row"><div class="bp-lvl' + lockCls + '">' + l.level + '</div>' +
+        '<div class="bp-rew"><div>' + free + '</div><div>' + prem + '</div></div></div>';
+    }).join('');
+  });
+}
+
+function bpReward(coins, diamonds, item, claimed, canClaim, level, track) {
+  var parts = [];
+  if (coins) parts.push(coins + '🪙');
+  if (diamonds) parts.push(diamonds + '💎');
+  if (item) parts.push('🎁');
+  if (!parts.length) parts.push('—');
+  var label = (track === 'prem' ? '⭐ ' : '') + parts.join(' ');
+  var chip = '<span class="bp-chip' + (track === 'prem' ? ' prem' : '') + '">' + label + '</span>';
+  if (claimed) return chip + ' ✅';
+  if (canClaim && (coins || diamonds || item)) {
+    return chip + ' <span class="bp-chip" style="cursor:pointer;color:var(--accent);" onclick="claimBP(' + level + ',\'' + track + '\')">Olish</span>';
+  }
+  return chip;
+}
+
+function claimBP(level, track) {
+  api('bp_claim', { level: level, track: track }).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    USER.coins = res.coins; USER.diamonds = res.diamonds;
+    renderUser();
+    var r = res.reward;
+    toast('Olindi: ' + (r.coins ? r.coins + '🪙 ' : '') + (r.diamonds ? r.diamonds + '💎' : ''));
+    loadBP();
+  });
+}
+
+function buyPremium() {
+  api('bp_buy_premium', {}).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    if (tg && tg.openInvoice) {
+      tg.openInvoice(res.invoice, function (status) {
+        if (status === 'paid') { toast('Premium ochildi! 🎟'); setTimeout(loadBP, 1500); }
+      });
+    } else { toast('Telegram orqali oching'); }
+  });
+}
+
+/* ==================== DO'ST BILAN 1v1 ==================== */
+function openFriend() {
+  var html = '<h2 style="padding:0;">👥 Do\'st bilan 1v1</h2>' +
+    '<p class="muted" style="margin:8px 0 16px;">Havola yarating va do\'stingizga yuboring. U havolaga kirsa, o\'yin boshlanadi.</p>' +
+    '<button class="btn grad" onclick="createChallenge()">🔗 Havola yaratish</button>' +
+    '<div style="margin:14px 0;text-align:center;" class="muted">yoki</div>' +
+    '<input id="joinInput" placeholder="Kod kiriting" style="width:100%;padding:12px;border-radius:11px;border:1px solid var(--sep);background:var(--bg);color:var(--text);text-align:center;font-size:16px;text-transform:uppercase;">' +
+    '<button class="btn sec" style="margin-top:10px;" onclick="joinByCode(document.getElementById(\'joinInput\').value)">Kirish</button>' +
+    '<button class="btn sec" style="margin-top:10px;" onclick="closeResult()">Yopish</button>';
+  document.getElementById('resultCard').innerHTML = html;
+  document.getElementById('ov').classList.add('show');
+}
+
+function createChallenge() {
+  api('challenge_create', {}).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    MATCH_ID = res.match_id;
+    var bot = INVITE_BOT || '';
+    var link = bot ? ('https://t.me/' + bot + '?start=match_' + res.code) : (location.origin + location.pathname + '?join=' + res.code);
+    var text = "Shashka o'yiniga chaqiraman! 🎯 Kod: " + res.code;
+    var share = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text);
+    var html = '<h2 style="padding:0;">🔗 Havola tayyor</h2>' +
+      '<div style="font-size:30px;font-weight:800;letter-spacing:3px;margin:14px 0;">' + res.code + '</div>' +
+      '<button class="btn grad" onclick="shareLink(\'' + share.replace(/'/g, "%27") + '\')">📤 Do\'stga yuborish</button>' +
+      '<p class="muted" style="margin-top:12px;">Do\'stingiz kirgach o\'yin avtomatik boshlanadi. Kuting...</p>' +
+      '<div class="spin" style="margin:14px auto;"></div>';
+    document.getElementById('resultCard').innerHTML = html;
+    document.getElementById('ov').classList.add('show');
+    // raqib kirishini kutamiz
+    if (WAIT_POLL) clearInterval(WAIT_POLL);
+    WAIT_POLL = setInterval(checkWaiting, 2000);
+  });
+}
+
+function shareLink(url) {
+  if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+  else window.open(url, '_blank');
+}
+
+function joinByCode(code) {
+  code = (code || '').trim().toUpperCase();
+  if (!code) { toast('Kod kiriting'); return; }
+  api('challenge_join', { code: code }).then(function (res) {
+    if (!res.success) { toast(res.error || 'Topilmadi'); return; }
+    MATCH_ID = res.match_id;
+    document.getElementById('ov').classList.remove('show');
+    enterOnline();
+  });
+}
+
+/* ==================== DO'ST TAKLIF (referral) ==================== */
+var INVITE_BOT = '';
 function inviteFriend() {
   api('invite_info', {}).then(function (res) {
     if (!res.success) { toast('Xato'); return; }
-    // Mini App havolasi: bot orqali start parametri bilan
-    var botUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.bot) ? tg.initDataUnsafe.bot.username : null;
+    INVITE_BOT = res.bot_username || '';
     var refCode = 'ref_' + res.telegram_id;
-    var shareUrl;
-    if (botUser) {
-      shareUrl = 'https://t.me/' + botUser + '?start=' + refCode;
-    } else {
-      // bot username bo'lmasa, app_url orqali
-      shareUrl = res.app_url + '?start=' + refCode;
-    }
-    var text = "Men bilan Shashka o'ynaymizmi? 🎯 Sovg'a sifatida tangalar oling!";
+    var shareUrl = INVITE_BOT
+      ? ('https://t.me/' + INVITE_BOT + '?start=' + refCode)
+      : (res.app_url + '?start=' + refCode);
+    var text = "Men bilan Shashka o'ynaymizmi? 🎯 Sovg'a: 100🪙 olasiz!";
     var tgShare = 'https://t.me/share/url?url=' + encodeURIComponent(shareUrl) + '&text=' + encodeURIComponent(text);
-
-    if (tg && tg.openTelegramLink) {
-      tg.openTelegramLink(tgShare);
-    } else {
-      window.open(tgShare, '_blank');
-    }
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(tgShare);
+    else window.open(tgShare, '_blank');
   });
 }
+

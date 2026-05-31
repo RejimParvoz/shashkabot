@@ -5,7 +5,8 @@
  * mod_rewrite KERAK EMAS.
  */
 $apiBase = './api.php';
-$ver = '1.1.0';
+$ver = '1.2.0';
+$joinCode = isset($_GET['join']) ? preg_replace('/[^A-Za-z0-9]/', '', $_GET['join']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="uz">
@@ -116,6 +117,24 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 .spin{width:36px;height:36px;border:3px solid var(--sep);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;}
 @keyframes sp{to{transform:rotate(360deg);}}
 .matchwait{text-align:center;padding:40px 20px;}
+.progress{height:10px;background:rgba(118,118,128,.18);border-radius:6px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#0a84ff,#5e5ce6);border-radius:6px;transition:width .4s;}
+.bp-row{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:13px;padding:10px 12px;margin:7px 16px;}
+.bp-lvl{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;}
+.bp-lvl.lock{background:var(--muted);}
+.bp-rew{flex:1;display:flex;gap:8px;flex-wrap:wrap;font-size:13px;}
+.bp-chip{padding:3px 8px;border-radius:8px;background:rgba(118,118,128,.15);font-weight:600;}
+.bp-chip.prem{background:linear-gradient(135deg,#ffd60a33,#ff950033);}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:18px 16px 6px;}
+.pod{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;}
+.pod .av{border-radius:50%;object-fit:cover;background:var(--bg2);border:3px solid;}
+.pod1 .av{width:74px;height:74px;border-color:#ffd60a;}
+.pod2 .av{width:60px;height:60px;border-color:#aeb3bd;}
+.pod3 .av{width:60px;height:60px;border-color:#cd7f32;}
+.pod .nm{font-size:12px;font-weight:700;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pod .rt{font-size:12px;font-weight:800;color:var(--accent);}
+.pod .base{border-radius:10px 10px 0 0;background:linear-gradient(180deg,#0a84ff,#5e5ce6);color:#fff;font-weight:800;width:72px;display:flex;align-items:center;justify-content:center;}
+.pod1 .base{height:64px;font-size:26px;}.pod2 .base{height:44px;font-size:20px;}.pod3 .base{height:30px;font-size:18px;}
 </style>
 </head>
 <body>
@@ -124,13 +143,17 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 
 <div class="hdr">
   <div class="u"><img class="avatar" id="uAvatar" src=""><div><div id="uName" style="font-weight:700;">Mehmon</div><div class="muted">⭐ <span id="uRating">1000</span></div></div></div>
-  <div class="pill">🪙 <span id="uCoins">0</span></div>
+  <div class="row" style="gap:7px;">
+    <div class="pill">🪙 <span id="uCoins">0</span></div>
+    <div class="pill" onclick="nav('shop');shopTab('diamonds',document.querySelector('#shopSeg [data-t=diamonds]'))" style="cursor:pointer;">💎 <span id="uDiamonds">0</span></div>
+  </div>
 </div>
 
 <!-- HOME -->
 <div class="page active" id="p-home">
   <h1>Salom! 👋</h1>
   <div style="padding:0 16px;"><button class="btn grad" onclick="findOnline()">🌐 Online o'ynash</button></div>
+  <div style="padding:8px 16px;"><button class="btn sec" onclick="openFriend()">👥 Do'st bilan 1v1</button></div>
   <h2>Bot bilan o'ynash</h2>
   <div class="seg" id="levelSeg">
     <button data-l="easy" onclick="setLevel('easy',this)">Oson</button>
@@ -159,13 +182,27 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <div class="seg" id="shopSeg">
     <button data-t="board" class="on" onclick="shopTab('board',this)">Doskalar</button>
     <button data-t="piece" onclick="shopTab('piece',this)">Toshlar</button>
+    <button data-t="premium" onclick="shopTab('premium',this)">💎 Premium</button>
+    <button data-t="diamonds" onclick="shopTab('diamonds',this)">Olmos</button>
   </div>
   <div class="shop-grid" id="shopGrid"><div class="muted" style="padding:16px;">Yuklanmoqda...</div></div>
+</div>
+
+<!-- BATTLE PASS -->
+<div class="page" id="p-bp">
+  <h1>🎟 Battle Pass</h1>
+  <div class="card">
+    <div class="row between"><div><b id="bpLevelTxt">Daraja 0</b><div class="muted" id="bpXpTxt">0 XP</div></div>
+      <button class="btn sm gold" id="bpPremBtn" onclick="buyPremium()" style="width:auto;">Premium ochish (150⭐)</button></div>
+    <div class="progress" style="margin-top:10px;"><div class="progress-fill" id="bpFill" style="width:0%;"></div></div>
+  </div>
+  <div id="bpLevels"></div>
 </div>
 
 <!-- LEADERBOARD -->
 <div class="page" id="p-top">
   <h1>🏆 Reyting</h1>
+  <div class="podium" id="podium"></div>
   <div id="lbList"><div class="muted" style="padding:16px;">Yuklanmoqda...</div></div>
 </div>
 
@@ -193,6 +230,7 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 <div class="nav">
   <a class="on" data-p="home" onclick="nav('home')"><span class="i">🏠</span>Bosh</a>
   <a data-p="shop" onclick="nav('shop')"><span class="i">🏪</span>Do'kon</a>
+  <a data-p="bp" onclick="nav('bp')"><span class="i">🎟</span>Pass</a>
   <a data-p="top" onclick="nav('top')"><span class="i">🏆</span>Reyting</a>
   <a data-p="profile" onclick="nav('profile')"><span class="i">👤</span>Profil</a>
 </div>
@@ -200,7 +238,7 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 <div class="ov" id="ov"><div class="result" id="resultCard"></div></div>
 <div class="toast" id="toast"></div>
 
-<script>var API='<?php echo $apiBase; ?>';</script>
+<script>var API='<?php echo $apiBase; ?>'; var JOIN_CODE='<?php echo $joinCode; ?>';</script>
 <script src="./game.js?v=<?php echo $ver; ?>"></script>
 </body>
 </html>

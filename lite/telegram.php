@@ -121,3 +121,23 @@ function tgUpsertUser($tgUser, $refCode = null) {
 
     return dbFirst("SELECT * FROM users WHERE telegram_id = ?", [$tgUser['id']]);
 }
+
+
+/**
+ * Telegram Stars uchun invoice havolasi yaratish.
+ * Mini App buni tg.openInvoice(link) bilan ochadi.
+ * $payload - successful_payment da qaytadi (masalan "dia_<tgid>_<amount>").
+ */
+function tgCreateInvoiceLink($title, $description, $payload, $starsAmount) {
+    $res = tg('createInvoiceLink', [
+        'title' => $title,
+        'description' => $description,
+        'payload' => $payload,
+        'currency' => 'XTR',                       // Telegram Stars
+        'prices' => json_encode([['label' => $title, 'amount' => (int)$starsAmount]]),
+    ]);
+    if ($res && !empty($res['ok'])) {
+        return $res['result'];   // invoice link (string)
+    }
+    return null;
+}

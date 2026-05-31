@@ -44,6 +44,11 @@ exit;
 
 function handleUpdate($update) {
     if (isset($update['message'])) {
+        // Muvaffaqiyatli to'lov (Telegram Stars)
+        if (isset($update['message']['successful_payment'])) {
+            handlePayment($update['message']);
+            return;
+        }
         handleMessage($update['message']);
     } elseif (isset($update['callback_query'])) {
         $cq = $update['callback_query'];
@@ -52,11 +57,47 @@ function handleUpdate($update) {
             sendPlayButton($cq['message']['chat']['id']);
         }
     } elseif (isset($update['pre_checkout_query'])) {
-        // To'lovni tasdiqlash (Telegram Stars)
+        // To'lovni tasdiqlash (10 soniya ichida javob berish shart)
         tg('answerPreCheckoutQuery', [
             'pre_checkout_query_id' => $update['pre_checkout_query']['id'],
             'ok' => 'true',
         ]);
+    }
+}
+
+/**
+ * Telegram Stars to'lovi muvaffaqiyatli tugagach.
+ * payload: "dia_<tgid>_<diamonds>" yoki "bp_<tgid>"
+ */
+function handlePayment($message) {
+    $sp = $message['successful_payment'];
+    $payload = isset($sp['invoice_payload']) ? $sp['invoice_payload'] : '';
+    $chargeId = isset($sp['telegram_payment_charge_id']) ? $sp['telegram_payment_charge_id'] : '';
+    $stars = isset($sp['total_amount']) ? (int)$sp['total_amount'] : 0;
+    $chatId = $message['chat']['id'];
+    $fromId = isset($message['from']['id']) ? (int)$message['from']['id'] : 0;
+
+    if ($chargeId === '' || $payload === '') { return; }
+
+    // Takror kreditni oldini olish
+    $exists = dbFirst("SELECT id FROM payments WHERE charge_id = ?", [$chargeId]);
+    if ($exists) { return; }
+
+    $user = dbFirst("SELECT * FROM users WHERE telegram_id = ?", [$fromId]);
+    if (!$user) { return; }
+
+    $parts = explode('_', $payload);
+    if ($parts[0] === 'dia' && isset($parts[2])) {
+        $diamonds = (int)$parts[2];
+        dbExec("UPDATE users SET diamonds = diamonds + ? WHERE id = ?", [$diamonds, $user['id']]);
+        dbInsert("INSERT INTO payments (charge_id, user_id, kind, amount, stars, created_at) VALUES (?, ?, 'diamonds', ?, ?, NOW())",
+            [$chargeId, $user['id'], $diamonds, $stars]);
+        tg('sendMessage', ['chat_id' => $chatId, 'text' => "✅ {$diamonds} 💎 hisobingizga qo'shildi! Rahmat!"]);
+    } elseif ($parts[0] === 'bp') {
+        dbExec("UPDATE users SET bp_premium = 1 WHERE id = ?", [$user['id']]);
+        dbInsert("INSERT INTO payments (charge_id, user_id, kind, amount, stars, created_at) VALUES (?, ?, 'bp_premium', 1, ?, NOW())",
+            [$chargeId, $user['id'], $stars]);
+        tg('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Battle Pass Premium ochildi! 🎟"]);
     }
 }
 
@@ -65,15 +106,19 @@ function handleMessage($message) {
     $text = isset($message['text']) ? trim($message['text']) : '';
     $from = isset($message['from']) ? $message['from'] : [];
 
-    // /start dan referral kodini ajratib olish: "/start 123456"
+    // /start dan parametr ajratish: "/start ref_123" yoki "/start match_ABC123"
     $refCode = null;
+    $joinCode = null;
     if (strpos($text, '/start') === 0) {
         $parts = explode(' ', $text, 2);
         if (isset($parts[1])) {
             $param = trim($parts[1]);
-            // "ref_123456" yoki "123456" ko'rinishida
-            $param = str_replace('ref_', '', $param);
-            if (is_numeric($param)) { $refCode = $param; }
+            if (strpos($param, 'match_') === 0) {
+                $joinCode = substr($param, 6);
+            } else {
+                $p = str_replace('ref_', '', $param);
+                if (is_numeric($p)) { $refCode = $p; }
+            }
         }
     }
 
@@ -84,10 +129,19 @@ function handleMessage($message) {
 
     if (strpos($text, '/start') === 0) {
         $name = isset($from['first_name']) ? $from['first_name'] : 'do\'st';
-        sendPlayButton(
-            $chatId,
-            "Salom, " . $name . "! 🎯\n\nShashka o'yiniga xush kelibsiz. O'ynashni boshlash uchun tugmani bosing:"
-        );
+        if ($joinCode) {
+            // Do'st o'yiniga taklif havolasi orqali kirgan
+            sendPlayButton(
+                $chatId,
+                "Do'stingiz sizni o'yinga taklif qildi! 🎯\nQabul qilish uchun tugmani bosing:",
+                '/index.php?join=' . urlencode($joinCode)
+            );
+        } else {
+            sendPlayButton(
+                $chatId,
+                "Salom, " . $name . "! 🎯\n\nShashka o'yiniga xush kelibsiz. O'ynashni boshlash uchun tugmani bosing:"
+            );
+        }
     } elseif (strpos($text, '/help') === 0) {
         tg('sendMessage', [
             'chat_id' => $chatId,
@@ -98,10 +152,10 @@ function handleMessage($message) {
     }
 }
 
-function sendPlayButton($chatId, $text = "🎮 Shashka o'ynash:") {
+function sendPlayButton($chatId, $text = "🎮 Shashka o'ynash:", $path = '/index.php') {
     $keyboard = [
         'inline_keyboard' => [[
-            ['text' => "🎮 O'yinni ochish", 'web_app' => ['url' => APP_URL . '/index.php']],
+            ['text' => "🎮 O'yinni ochish", 'web_app' => ['url' => APP_URL . $path]],
         ]],
     ];
     tg('sendMessage', [

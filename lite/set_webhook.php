@@ -37,6 +37,18 @@ if ($do === 'set') {
     } else {
         echo "<h3 style='color:red'>❌ Xato. Yuqoridagi javobni tekshiring.</h3>";
     }
+
+    // Bot menyu tugmasi (doimiy "O'ynash" tugmasi Mini App ochadi)
+    $menuRes = tg('setChatMenuButton', [
+        'menu_button' => json_encode([
+            'type' => 'web_app',
+            'text' => "🎮 O'ynash",
+            'web_app' => ['url' => APP_URL . '/index.php'],
+        ]),
+    ]);
+    if (!empty($menuRes['ok'])) {
+        echo "<p style='color:green'>✅ Menyu tugmasi o'rnatildi (botda 🎮 O'ynash)</p>";
+    }
 } elseif ($do === 'delete') {
     $res = tg('deleteWebhook', ['drop_pending_updates' => 'true']);
     echo "<pre>" . htmlspecialchars(json_encode($res, JSON_PRETTY_PRINT)) . "</pre>";

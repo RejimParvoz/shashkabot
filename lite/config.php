@@ -16,6 +16,7 @@ define('DB_CHARSET', 'utf8mb4');
 
 // ---- Telegram bot ----
 define('BOT_TOKEN', 'BOT_TOKENNI_SHU_YERGA');     // @BotFather dan
+define('BOT_USERNAME', 'ShashkaBot');              // @siz (faqat nom, @ siz)
 define('APP_URL', 'https://topkons.uz/shashka');  // loyiha manzili
 define('WEBHOOK_SECRET', '');                      // ixtiyoriy maxfiy token
 

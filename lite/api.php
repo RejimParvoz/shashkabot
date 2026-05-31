@@ -66,7 +66,28 @@ function publicUser($u) {
         'equipped_board' => isset($u['equipped_board']) ? $u['equipped_board'] : 'classic',
         'equipped_piece' => isset($u['equipped_piece']) ? $u['equipped_piece'] : 'classic',
         'referral_count' => isset($u['referral_count']) ? (int)$u['referral_count'] : 0,
+        'bp_xp' => isset($u['bp_xp']) ? (int)$u['bp_xp'] : 0,
+        'bp_premium' => isset($u['bp_premium']) ? (int)$u['bp_premium'] : 0,
+        'bp_level' => bpLevelFromXp(isset($u['bp_xp']) ? (int)$u['bp_xp'] : 0),
     ];
+}
+
+/** XP dan Battle Pass darajasini hisoblash */
+function bpLevelFromXp($xp) {
+    $levels = dbAll("SELECT level, xp_required FROM bp_levels ORDER BY level ASC");
+    $lvl = 0;
+    foreach ($levels as $l) {
+        if ($xp >= (int)$l['xp_required']) $lvl = (int)$l['level'];
+        else break;
+    }
+    return $lvl;
+}
+
+/** O'yin uchun XP qo'shish (game +10, win +25) */
+function awardXp($userId, $result) {
+    $xp = 10 + ($result === 'win' ? 25 : 0);
+    dbExec("UPDATE users SET bp_xp = bp_xp + ? WHERE id = ?", [$xp, $userId]);
+    return $xp;
 }
 
 function calcRatingChange($result, $botLevel) {
@@ -135,6 +156,7 @@ switch ($action) {
              VALUES (?, ?, ?, 'bot', ?, ?, ?, NOW())",
             [$user['id'], $mode, $botLevel, $result, $moves, $ratingChange]
         );
+        awardXp($user['id'], $result);
         $updated = dbFirst("SELECT * FROM users WHERE id = ?", [$user['id']]);
         jsonResponse(['success' => true, 'rating_change' => $ratingChange, 'coins_earned' => $coins, 'user' => publicUser($updated)]);
         break;
@@ -142,18 +164,20 @@ switch ($action) {
     /* ---------------- DO'KON (faqat tanga) ---------------- */
     case 'shop_list':
         $user = currentUser();
-        $items = dbAll("SELECT code, name, type, price_coins, data, sort FROM shop_items ORDER BY type, sort");
+        $items = dbAll("SELECT code, name, type, price_coins, price_diamonds, premium, data, sort FROM shop_items ORDER BY premium, type, sort");
         $owned = dbAll("SELECT item_code FROM user_items WHERE user_id = ?", [$user['id']]);
         $ownedCodes = array_column($owned, 'item_code');
         foreach ($items as &$it) {
             $it['price_coins'] = (int)$it['price_coins'];
-            // bepul buyumlar avtomatik egalik qilinadi
-            $it['owned'] = ($it['price_coins'] === 0) || in_array($it['code'], $ownedCodes);
+            $it['price_diamonds'] = (int)$it['price_diamonds'];
+            $it['premium'] = (int)$it['premium'];
+            $isFree = ($it['price_coins'] === 0 && $it['price_diamonds'] === 0);
+            $it['owned'] = $isFree || in_array($it['code'], $ownedCodes);
             $it['equipped'] = ($it['type'] === 'board' && $it['code'] === $user['equipped_board'])
                 || ($it['type'] === 'piece' && $it['code'] === $user['equipped_piece']);
         }
         unset($it);
-        jsonResponse(['success' => true, 'items' => $items, 'coins' => (int)$user['coins']]);
+        jsonResponse(['success' => true, 'items' => $items, 'coins' => (int)$user['coins'], 'diamonds' => (int)$user['diamonds']]);
         break;
 
     case 'shop_buy':
@@ -164,16 +188,29 @@ switch ($action) {
         if (!$item) jsonResponse(['success' => false, 'error' => 'Buyum topilmadi'], 404);
 
         $already = dbFirst("SELECT id FROM user_items WHERE user_id = ? AND item_code = ?", [$user['id'], $code]);
-        if ($already || (int)$item['price_coins'] === 0) {
+        $isFree = ((int)$item['price_coins'] === 0 && (int)$item['price_diamonds'] === 0);
+        if ($already || $isFree) {
             jsonResponse(['success' => false, 'error' => 'Allaqachon sizniki'], 400);
         }
-        if ((int)$user['coins'] < (int)$item['price_coins']) {
-            jsonResponse(['success' => false, 'error' => 'Tanga yetarli emas'], 400);
+
+        $useDiamonds = ((int)$item['price_diamonds'] > 0);
+        if ($useDiamonds) {
+            if ((int)$user['diamonds'] < (int)$item['price_diamonds']) {
+                jsonResponse(['success' => false, 'error' => 'Olmos yetarli emas'], 400);
+            }
+        } else {
+            if ((int)$user['coins'] < (int)$item['price_coins']) {
+                jsonResponse(['success' => false, 'error' => 'Tanga yetarli emas'], 400);
+            }
         }
 
         db()->beginTransaction();
         try {
-            dbExec("UPDATE users SET coins = coins - ? WHERE id = ?", [(int)$item['price_coins'], $user['id']]);
+            if ($useDiamonds) {
+                dbExec("UPDATE users SET diamonds = diamonds - ? WHERE id = ?", [(int)$item['price_diamonds'], $user['id']]);
+            } else {
+                dbExec("UPDATE users SET coins = coins - ? WHERE id = ?", [(int)$item['price_coins'], $user['id']]);
+            }
             dbInsert("INSERT INTO user_items (user_id, item_code, bought_at) VALUES (?, ?, NOW())", [$user['id'], $code]);
             db()->commit();
         } catch (Exception $e) {
@@ -181,7 +218,7 @@ switch ($action) {
             jsonResponse(['success' => false, 'error' => 'Xarid amalga oshmadi'], 500);
         }
         $updated = dbFirst("SELECT * FROM users WHERE id = ?", [$user['id']]);
-        jsonResponse(['success' => true, 'coins' => (int)$updated['coins']]);
+        jsonResponse(['success' => true, 'coins' => (int)$updated['coins'], 'diamonds' => (int)$updated['diamonds']]);
         break;
 
     case 'shop_equip':
@@ -191,7 +228,8 @@ switch ($action) {
         $item = dbFirst("SELECT * FROM shop_items WHERE code = ?", [$code]);
         if (!$item) jsonResponse(['success' => false, 'error' => 'Buyum topilmadi'], 404);
 
-        $owned = ((int)$item['price_coins'] === 0)
+        $isFree = ((int)$item['price_coins'] === 0 && (int)$item['price_diamonds'] === 0);
+        $owned = $isFree
             || dbFirst("SELECT id FROM user_items WHERE user_id = ? AND item_code = ?", [$user['id'], $code]);
         if (!$owned) jsonResponse(['success' => false, 'error' => 'Avval sotib oling'], 400);
 
@@ -206,11 +244,11 @@ switch ($action) {
     /* ---------------- TAKLIF ---------------- */
     case 'invite_info':
         $user = currentUser();
-        // bot username config'da bo'lishi mumkin; bo'lmasa APP_URL ishlatamiz
         jsonResponse([
             'success' => true,
             'telegram_id' => (int)$user['telegram_id'],
             'referral_count' => (int)$user['referral_count'],
+            'bot_username' => defined('BOT_USERNAME') ? BOT_USERNAME : '',
             'app_url' => APP_URL,
         ]);
         break;
@@ -337,8 +375,154 @@ switch ($action) {
         jsonResponse(['success' => true]);
         break;
 
+    /* ---------------- O'YINCHI STATISTIKASI ---------------- */
+    case 'user_stats':
+        currentUser(); // so'rovchi avtorizatsiyadan o'tgan bo'lsin
+        $in = input();
+        $tgid = (int)(isset($in['telegram_id']) ? $in['telegram_id'] : 0);
+        $u = dbFirst("SELECT * FROM users WHERE telegram_id = ?", [$tgid]);
+        if (!$u) jsonResponse(['success' => false, 'error' => 'Topilmadi'], 404);
+        $rank = dbFirst("SELECT COUNT(*)+1 AS r FROM users WHERE rating > ?", [$u['rating']]);
+        $d = publicUser($u);
+        $d['rank'] = (int)$rank['r'];
+        $d['win_rate'] = $u['total_games'] > 0 ? round($u['wins'] / $u['total_games'] * 100, 1) : 0;
+        jsonResponse(['success' => true, 'profile' => $d]);
+        break;
+
+    /* ---------------- BATTLE PASS ---------------- */
+    case 'bp_state':
+        $user = currentUser();
+        $levels = dbAll("SELECT * FROM bp_levels ORDER BY level ASC");
+        $claimed = $user['bp_claimed'] ? json_decode($user['bp_claimed'], true) : [];
+        if (!is_array($claimed)) $claimed = [];
+        $xp = (int)$user['bp_xp'];
+        $curLevel = bpLevelFromXp($xp);
+        foreach ($levels as &$l) {
+            $l['level'] = (int)$l['level'];
+            $l['xp_required'] = (int)$l['xp_required'];
+            $l['free_coins'] = (int)$l['free_coins'];
+            $l['free_diamonds'] = (int)$l['free_diamonds'];
+            $l['prem_coins'] = (int)$l['prem_coins'];
+            $l['prem_diamonds'] = (int)$l['prem_diamonds'];
+            $l['unlocked'] = $curLevel >= $l['level'];
+            $l['claimed_free'] = in_array('f' . $l['level'], $claimed);
+            $l['claimed_prem'] = in_array('p' . $l['level'], $claimed);
+        }
+        unset($l);
+        jsonResponse([
+            'success' => true, 'xp' => $xp, 'level' => $curLevel,
+            'premium' => (int)$user['bp_premium'], 'levels' => $levels,
+            'coins' => (int)$user['coins'], 'diamonds' => (int)$user['diamonds'],
+        ]);
+        break;
+
+    case 'bp_claim':
+        $user = currentUser();
+        $in = input();
+        $level = (int)(isset($in['level']) ? $in['level'] : 0);
+        $track = isset($in['track']) ? $in['track'] : 'free'; // free | prem
+        $lvl = dbFirst("SELECT * FROM bp_levels WHERE level = ?", [$level]);
+        if (!$lvl) jsonResponse(['success' => false, 'error' => 'Daraja topilmadi'], 404);
+        if (bpLevelFromXp((int)$user['bp_xp']) < $level) jsonResponse(['success' => false, 'error' => 'Bu darajaga yetmadingiz'], 400);
+        if ($track === 'prem' && (int)$user['bp_premium'] !== 1) jsonResponse(['success' => false, 'error' => 'Premium kerak'], 400);
+
+        $claimed = $user['bp_claimed'] ? json_decode($user['bp_claimed'], true) : [];
+        if (!is_array($claimed)) $claimed = [];
+        $key = ($track === 'prem' ? 'p' : 'f') . $level;
+        if (in_array($key, $claimed)) jsonResponse(['success' => false, 'error' => 'Allaqachon olingan'], 400);
+
+        $coins = $track === 'prem' ? (int)$lvl['prem_coins'] : (int)$lvl['free_coins'];
+        $diamonds = $track === 'prem' ? (int)$lvl['prem_diamonds'] : (int)$lvl['free_diamonds'];
+        $item = ($track === 'prem' && !empty($lvl['prem_item'])) ? $lvl['prem_item'] : null;
+
+        db()->beginTransaction();
+        try {
+            dbExec("UPDATE users SET coins = coins + ?, diamonds = diamonds + ? WHERE id = ?", [$coins, $diamonds, $user['id']]);
+            if ($item) {
+                dbInsert("INSERT IGNORE INTO user_items (user_id, item_code, bought_at) VALUES (?, ?, NOW())", [$user['id'], $item]);
+            }
+            $claimed[] = $key;
+            dbExec("UPDATE users SET bp_claimed = ? WHERE id = ?", [json_encode($claimed), $user['id']]);
+            db()->commit();
+        } catch (Exception $e) {
+            db()->rollBack();
+            jsonResponse(['success' => false, 'error' => 'Xato'], 500);
+        }
+        $updated = dbFirst("SELECT * FROM users WHERE id = ?", [$user['id']]);
+        jsonResponse(['success' => true, 'coins' => (int)$updated['coins'], 'diamonds' => (int)$updated['diamonds'],
+            'reward' => ['coins' => $coins, 'diamonds' => $diamonds, 'item' => $item]]);
+        break;
+
+    /* ---------------- OLMOS XARID (Telegram Stars) ---------------- */
+    case 'diamond_packs':
+        currentUser();
+        jsonResponse(['success' => true, 'packs' => diamondPacks()]);
+        break;
+
+    case 'buy_diamonds':
+        $user = currentUser();
+        $in = input();
+        $packId = isset($in['pack']) ? $in['pack'] : '';
+        $packs = diamondPacks();
+        $pack = null;
+        foreach ($packs as $p) { if ($p['id'] === $packId) { $pack = $p; break; } }
+        if (!$pack) jsonResponse(['success' => false, 'error' => 'Paket topilmadi'], 404);
+
+        $payload = 'dia_' . $user['telegram_id'] . '_' . $pack['diamonds'];
+        $link = tgCreateInvoiceLink('💎 ' . $pack['diamonds'] . ' Olmos', 'Shashka uchun olmoslar', $payload, $pack['stars']);
+        if (!$link) jsonResponse(['success' => false, 'error' => 'Invoice yaratilmadi (bot token?)'], 500);
+        jsonResponse(['success' => true, 'invoice' => $link]);
+        break;
+
+    case 'bp_buy_premium':
+        $user = currentUser();
+        if ((int)$user['bp_premium'] === 1) jsonResponse(['success' => false, 'error' => 'Premium allaqachon bor'], 400);
+        $payload = 'bp_' . $user['telegram_id'];
+        $link = tgCreateInvoiceLink('🎟 Battle Pass Premium', 'Premium track ochish', $payload, 150);
+        if (!$link) jsonResponse(['success' => false, 'error' => 'Invoice yaratilmadi'], 500);
+        jsonResponse(['success' => true, 'invoice' => $link]);
+        break;
+
+    /* ---------------- DO'ST BILAN 1v1 ---------------- */
+    case 'challenge_create':
+        $user = currentUser();
+        // eski faol/kutuv o'yinlarini tozalash
+        dbExec("DELETE FROM matches WHERE p1_id = ? AND status = 'waiting'", [$user['id']]);
+        $code = strtoupper(substr(md5(uniqid('', true)), 0, 6));
+        $board = json_encode(eNewBoard());
+        $mid = dbInsert(
+            "INSERT INTO matches (p1_id, board, turn, status, is_private, code, created_at) VALUES (?, ?, 2, 'waiting', 1, ?, NOW())",
+            [$user['id'], $board, $code]
+        );
+        jsonResponse(['success' => true, 'match_id' => (int)$mid, 'code' => $code, 'telegram_id' => (int)$user['telegram_id']]);
+        break;
+
+    case 'challenge_join':
+        $user = currentUser();
+        $in = input();
+        $code = strtoupper(trim(isset($in['code']) ? $in['code'] : ''));
+        if ($code === '') jsonResponse(['success' => false, 'error' => 'Kod yo\'q'], 400);
+        $m = dbFirst("SELECT * FROM matches WHERE code = ? AND is_private = 1 ORDER BY id DESC LIMIT 1", [$code]);
+        if (!$m) jsonResponse(['success' => false, 'error' => 'Bunday o\'yin topilmadi'], 404);
+        if ((int)$m['p1_id'] === (int)$user['id']) jsonResponse(['success' => false, 'error' => 'Bu sizning o\'yiningiz'], 400);
+        if ($m['status'] !== 'waiting') jsonResponse(['success' => false, 'error' => 'O\'yin allaqachon boshlangan'], 400);
+        dbExec("UPDATE matches SET p2_id = ?, status = 'active' WHERE id = ? AND status = 'waiting'", [$user['id'], $m['id']]);
+        jsonResponse(['success' => true, 'match_id' => (int)$m['id']]);
+        break;
+
     default:
         jsonResponse(['success' => false, 'error' => 'Noma\'lum action'], 404);
+}
+
+/** Olmos paketlari (Telegram Stars) */
+function diamondPacks() {
+    return [
+        ['id' => 'p1', 'diamonds' => 100, 'stars' => 10],
+        ['id' => 'p2', 'diamonds' => 550, 'stars' => 45],
+        ['id' => 'p3', 'diamonds' => 1300, 'stars' => 100],
+        ['id' => 'p4', 'diamonds' => 2800, 'stars' => 200],
+        ['id' => 'p5', 'diamonds' => 6000, 'stars' => 380],
+    ];
 }
 
 /** Online o'yin tugagach ikkala o'yinchining statistikasini yangilash */
@@ -377,4 +561,5 @@ function updatePlayer($u, $ratingChange, $coins, $result, $m) {
          VALUES (?, 'online', 'online', ?, ?, ?, NOW())",
         [$u['id'], $result, (int)$m['move_count'], $ratingChange]
     );
+    awardXp($u['id'], $result);
 }
