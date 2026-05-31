@@ -1,0 +1,152 @@
+# Shashka Game - Apache Configuration
+# High Performance Configuration for 1M+ Users
+
+# Enable mod_rewrite
+RewriteEngine On
+
+# Security Headers
+<IfModule mod_headers.c>
+    # HSTS (1 year)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    
+    # XSS Protection
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Content Type Options
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Frame Options
+    Header always set X-Frame-Options "DENY"
+    
+    # Referrer Policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: https:; font-src 'self' data:;"
+</IfModule>
+
+# Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# Browser Caching (1 year for static assets)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Images
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    
+    # CSS and JavaScript
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/x-javascript "access plus 1 year"
+    
+    # Fonts
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    
+    # Default
+    ExpiresDefault "access plus 1 month"
+</IfModule>
+
+# Cache-Control Headers
+<IfModule mod_headers.c>
+    # Static Assets
+    <FilesMatch "\.(css|js|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|eot|ico)$">
+        Header set Cache-Control "max-age=31536000, public, immutable"
+    </FilesMatch>
+    
+    # HTML Files
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "max-age=300, public"
+    </FilesMatch>
+    
+    # API Responses
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, private, max-age=0"
+    </FilesMatch>
+</IfModule>
+
+# Security - Block access to sensitive files
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "composer.json">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "*.log">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Block access to directories
+RedirectMatch 404 ^/(config|core|models|controllers|views|storage|database|cron)/
+
+# Main Rewrite Rules
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# API Routes
+RewriteRule ^api/(.*)$ index.php?route=api/$1 [QSA,L]
+
+# Admin Routes
+RewriteRule ^admin/(.*)$ index.php?route=admin/$1 [QSA,L]
+
+# Game Routes
+RewriteRule ^game/(.*)$ index.php?route=game/$1 [QSA,L]
+
+# Profile Routes
+RewriteRule ^profile/(.*)$ index.php?route=profile/$1 [QSA,L]
+
+# Shop Routes
+RewriteRule ^shop/(.*)$ index.php?route=shop/$1 [QSA,L]
+
+# Tournament Routes
+RewriteRule ^tournament/(.*)$ index.php?route=tournament/$1 [QSA,L]
+
+# Clan Routes
+RewriteRule ^clan/(.*)$ index.php?route=clan/$1 [QSA,L]
+
+# Default Route
+RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+
+# Rate Limiting (requires mod_security or similar)
+<IfModule mod_security.c>
+    SecRule IP:REQUEST_COUNT "@gt 100" "phase:1,deny,status:429,msg:'Rate limit exceeded'"
+    SecAction "phase:1,initcol:ip=%{REMOTE_ADDR},expirevar:ip.request_count=60"
+    SecAction "phase:1,setvar:ip.request_count=+1"
+</IfModule>
+
+# PHP Configuration
+<IfModule mod_php7.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value error_log "../storage/logs/error.log"
+    php_value memory_limit 256M
+    php_value max_execution_time 30
+    php_value upload_max_filesize 5M
+    php_value post_max_size 10M
+    php_flag opcache.enable On
+    php_value opcache.memory_consumption 256
+    php_value opcache.max_accelerated_files 20000
+</IfModule>
