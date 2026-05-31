@@ -14,6 +14,21 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/telegram.php';
 require_once __DIR__ . '/engine.php';
 
+// Global xato ushlagich: har qanday xatoni JSON qilib qaytaradi (jimgina o'lib qolmasin)
+set_exception_handler(function ($e) {
+    error_log('API fatal: ' . $e->getMessage());
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    $msg = $e->getMessage();
+    if (stripos($msg, "doesn't exist") !== false || stripos($msg, 'Unknown column') !== false || stripos($msg, 'Base table') !== false) {
+        $msg = "Baza yangilanmagan. install.php ni qayta oching.";
+    }
+    echo json_encode(['success' => false, 'error' => $msg], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
 // CORS (Telegram Mini App uchun)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -84,7 +99,11 @@ function isVipActive($u) {
 
 /** XP dan Battle Pass darajasini hisoblash */
 function bpLevelFromXp($xp) {
-    $levels = dbAll("SELECT level, xp_required FROM bp_levels ORDER BY level ASC");
+    try {
+        $levels = dbAll("SELECT level, xp_required FROM bp_levels ORDER BY level ASC");
+    } catch (Exception $e) {
+        return 0;
+    }
     $lvl = 0;
     foreach ($levels as $l) {
         if ($xp >= (int)$l['xp_required']) $lvl = (int)$l['level'];

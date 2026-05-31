@@ -152,17 +152,30 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 .pod .base{border-radius:10px 10px 0 0;background:linear-gradient(180deg,#0a84ff,#5e5ce6);color:#fff;font-weight:800;width:72px;display:flex;align-items:center;justify-content:center;}
 .pod1 .base{height:64px;font-size:26px;}.pod2 .base{height:44px;font-size:20px;}.pod3 .base{height:30px;font-size:18px;}
 .loader.hide{opacity:0;pointer-events:none;transition:opacity .45s;}
-/* Chat */
-.chat{margin:10px 16px;background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06);}
-.chat-msgs{max-height:160px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;}
-.cmsg{max-width:78%;padding:7px 11px;border-radius:14px;font-size:14px;word-break:break-word;}
-.cmsg.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
-.cmsg.them{align-self:flex-start;background:rgba(118,118,128,.16);border-bottom-left-radius:4px;}
-.chat-input{display:flex;gap:6px;padding:8px;border-top:.5px solid var(--sep);}
-.chat-input input{flex:1;padding:9px 12px;border-radius:18px;border:1px solid var(--sep);background:var(--bg);color:var(--text);font-size:14px;}
-.chat-input button{width:40px;border-radius:50%;background:var(--accent);color:#fff;font-size:16px;}
-.chat-quick{display:flex;gap:6px;flex-wrap:wrap;padding:0 8px 8px;}
-.chat-quick span{padding:5px 10px;border-radius:14px;background:rgba(118,118,128,.16);font-size:16px;cursor:pointer;}
+/* Professional pastki chat dock */
+.chatdock{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:480px;z-index:80;
+  background:var(--card);border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.18);
+  border-top:.5px solid var(--sep);transition:transform .3s cubic-bezier(.3,1,.4,1);}
+.chatdock.collapsed{transform:translateX(-50%) translateY(calc(100% - 50px));}
+.chatdock-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;}
+.chatdock-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;}
+.chatdock-badge{background:var(--danger);color:#fff;font-size:11px;font-weight:800;min-width:18px;height:18px;
+  border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;}
+.chatdock-arrow{font-size:16px;color:var(--muted);transition:transform .3s;}
+.chatdock.collapsed .chatdock-arrow{transform:rotate(180deg);}
+.chatdock-body{padding:0 12px calc(12px + env(safe-area-inset-bottom));}
+.chat-msgs{height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:6px 2px;}
+.chat-msgs::-webkit-scrollbar{width:0;}
+.cmsg{max-width:80%;padding:8px 13px;border-radius:16px;font-size:14px;word-break:break-word;line-height:1.3;animation:msgIn .2s;}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.cmsg.me{align-self:flex-end;background:linear-gradient(135deg,#0a84ff,#5e5ce6);color:#fff;border-bottom-right-radius:5px;}
+.cmsg.them{align-self:flex-start;background:rgba(118,118,128,.16);border-bottom-left-radius:5px;}
+.chat-quick{display:flex;gap:6px;flex-wrap:wrap;padding:6px 2px;}
+.chat-quick span{padding:6px 11px;border-radius:16px;background:rgba(118,118,128,.14);font-size:15px;cursor:pointer;transition:transform .1s;}
+.chat-quick span:active{transform:scale(.9);}
+.chat-input{display:flex;gap:8px;padding:8px 0 4px;}
+.chat-input input{flex:1;padding:11px 15px;border-radius:22px;border:none;background:rgba(118,118,128,.14);color:var(--text);font-size:15px;outline:none;}
+.chat-input button{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0a84ff,#5e5ce6);color:#fff;font-size:17px;flex-shrink:0;}
 /* Tournament */
 .tcard{background:var(--card);border-radius:16px;padding:15px;margin:9px 16px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
 .tcard .th{display:flex;justify-content:space-between;align-items:center;}
@@ -190,6 +203,34 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   background:linear-gradient(120deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:shine 3s infinite;}
 @keyframes shine{0%,60%{left:-60%;}100%{left:130%;}}
 .shop-prev svg{display:block;}
+/* ===== PRO POLISH ===== */
+body{background:
+  radial-gradient(1200px 500px at 50% -10%, rgba(94,92,230,.10), transparent 60%),
+  radial-gradient(900px 400px at 50% 110%, rgba(10,132,255,.08), transparent 60%),
+  var(--bg);}
+h1{background:linear-gradient(120deg,var(--text),var(--text) 55%,#5e5ce6);-webkit-background-clip:text;background-clip:text;}
+.hdr{border-bottom:.5px solid var(--sep);}
+.pill{box-shadow:0 1px 3px rgba(0,0,0,.08),inset 0 0 0 .5px var(--sep);}
+.btn{letter-spacing:.2px;}
+.btn.grad{box-shadow:0 6px 18px rgba(10,132,255,.35);}
+.btn.gold{box-shadow:0 6px 18px rgba(255,149,0,.3);}
+.btn:active{transform:scale(.96);}
+.mode{position:relative;overflow:hidden;}
+.mode::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,#0a84ff,#5e5ce6);opacity:.85;}
+.mode .e{filter:drop-shadow(0 3px 6px rgba(0,0,0,.18));}
+.card{transition:transform .15s;}
+.seg{box-shadow:inset 0 0 0 .5px var(--sep);}
+.seg button.on{font-weight:700;}
+#board{box-shadow:0 12px 40px rgba(0,0,0,.28),0 0 0 4px rgba(255,255,255,.04);}
+.pbar{transition:box-shadow .25s,transform .15s;}
+.pbar.act{transform:translateY(-1px);}
+.lb,.tcard,.bp-row{transition:transform .12s;}
+.lb:active,.tcard:active{transform:scale(.99);}
+.nav a .i{transition:transform .15s;}
+.nav a.on .i{transform:scale(1.15) translateY(-1px);}
+.toast{border:.5px solid var(--sep);font-weight:600;}
+/* nozik kirish animatsiyalari */
+.page.active>h1{animation:fadeUp .35s both;}
 </style>
 </head>
 <body>
@@ -264,17 +305,23 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <div class="pbar act" id="meBar"><div class="nm"><span class="dot on"></span><span id="meName">😎 Siz</span></div><div id="myCount">12</div></div>
   <div class="row" style="padding:0 16px;gap:8px;">
     <button class="btn sec hidden" id="drawBtn" onclick="offerDraw()">🤝 Durang</button>
-    <button class="btn sec hidden" id="chatBtn" onclick="toggleChat()">💬 Chat</button>
     <button class="btn danger" onclick="resignCurrent()">🏳️ Taslim</button>
   </div>
-  <!-- Chat paneli (online) -->
-  <div class="chat hidden" id="chatPanel">
+</div>
+
+<!-- Professional pastki chat dock (online o'yinda) -->
+<div class="chatdock hidden" id="chatDock">
+  <div class="chatdock-head" onclick="toggleChat()">
+    <span class="chatdock-title">💬 Suhbat <span class="chatdock-badge hidden" id="chatBadge">0</span></span>
+    <span class="chatdock-arrow" id="chatArrow">▾</span>
+  </div>
+  <div class="chatdock-body" id="chatBody">
     <div class="chat-msgs" id="chatMsgs"></div>
-    <div class="chat-input">
-      <input id="chatText" maxlength="200" placeholder="Xabar..." onkeydown="if(event.key==='Enter')sendChat()">
-      <button onclick="sendChat()">➤</button>
-    </div>
     <div class="chat-quick" id="chatQuick"></div>
+    <div class="chat-input">
+      <input id="chatText" maxlength="200" placeholder="Xabar yozing..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()" aria-label="Yuborish">➤</button>
+    </div>
   </div>
 </div>
 

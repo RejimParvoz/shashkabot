@@ -60,6 +60,14 @@ function nav(page) {
   document.querySelectorAll('.nav a').forEach(function (a) {
     a.classList.toggle('on', a.getAttribute('data-p') === page);
   });
+  // O'yin paytida pastki navigatsiyani yashiramiz (toza ekran)
+  var navbar = document.querySelector('.nav');
+  if (navbar) navbar.style.display = (page === 'game') ? 'none' : 'flex';
+  // Chat dock faqat online o'yinda ko'rinadi
+  if (page !== 'game') {
+    var dock = document.getElementById('chatDock');
+    if (dock) dock.classList.add('hidden');
+  }
   if (page === 'top') loadLeaderboard();
   if (page === 'profile') loadProfile();
   if (page === 'shop') loadShop();
@@ -270,8 +278,7 @@ function startGame(mode) {
   document.getElementById('meName').textContent = '😎 Siz';
   document.getElementById('oppDot').classList.remove('on');
   document.getElementById('drawBtn').classList.add('hidden');
-  document.getElementById('chatBtn').classList.add('hidden');
-  document.getElementById('chatPanel').classList.add('hidden');
+  document.getElementById('chatDock').classList.add('hidden');
   nav('game');
   setupCanvas();
   render();
@@ -771,12 +778,15 @@ function enterOnline() {
     document.getElementById('oppName').textContent = '👤 ' + oppName;
     document.getElementById('meName').textContent = '😎 Siz';
     document.getElementById('oppDot').classList.add('on');
-    // chat va durang tugmalarini ko'rsatish
+    // chat dock va durang tugmasini ko'rsatish
     document.getElementById('drawBtn').classList.remove('hidden');
-    document.getElementById('chatBtn').classList.remove('hidden');
-    document.getElementById('chatPanel').classList.add('hidden');
+    var dock = document.getElementById('chatDock');
+    dock.classList.remove('hidden');
+    dock.classList.add('collapsed');
     document.getElementById('chatMsgs').innerHTML = '';
-    CHAT_LAST = 0; DRAW_SHOWN = false;
+    chatRenderQuick();
+    CHAT_LAST = 0; CHAT_UNREAD = 0; DRAW_SHOWN = false;
+    updateChatBadge();
     nav('game');
     setupCanvas();
     applyOnline(s);
@@ -1170,8 +1180,13 @@ var SND = {
 /* ==================== TURNIRLAR ==================== */
 var TOUR_TIMER = null;
 function loadTour() {
+  var box = document.getElementById('tourList');
+  box.innerHTML = '<div class="muted" style="padding:16px;">Yuklanmoqda...</div>';
   api('tournament_list', {}).then(function (res) {
-    if (!res.success) return;
+    if (!res.success) {
+      box.innerHTML = '<div class="card" style="text-align:center;color:var(--danger);">' + (res.error || 'Xatolik') + '</div>';
+      return;
+    }
     var skew = Date.now() / 1000 - res.server_ts;
     var html = res.tournaments.map(function (t) {
       return '<div class="tcard" data-ends="' + t.ends_ts + '">' +
@@ -1227,9 +1242,12 @@ function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
 /* ==================== VIP ==================== */
 function loadVip() {
+  var st = document.getElementById('vipStatus');
   api('vip_info', {}).then(function (res) {
-    if (!res.success) return;
-    var st = document.getElementById('vipStatus');
+    if (!res.success) {
+      st.innerHTML = '<div style="color:var(--danger);">' + (res.error || 'Xatolik') + '</div>';
+      return;
+    }
     if (res.is_vip) {
       st.innerHTML = '<div style="font-size:34px;">👑</div><h3 style="font-size:18px;">VIP ' + (res.level ? res.level.toUpperCase() : '') + '</h3>' +
         '<div class="muted">Tugaydi: ' + (res.until || '').substring(0, 10) + '</div>' +
@@ -1269,14 +1287,28 @@ function claimVip() {
 
 /* ==================== O'YIN CHATI ==================== */
 var CHAT_LAST = 0;
-var QUICK_EMOJIS = ['👍', '😅', '🔥', '😮', '🤝', 'GG', 'Salom'];
+var CHAT_UNREAD = 0;
+var QUICK_EMOJIS = ['👍', '😅', '🔥', '😮', '🤝', '👏', 'GG', 'Salom'];
+function chatRenderQuick() {
+  var q = document.getElementById('chatQuick');
+  if (q) q.innerHTML = QUICK_EMOJIS.map(function (e) { return '<span onclick="quickChat(\'' + e + '\')">' + e + '</span>'; }).join('');
+}
 function toggleChat() {
-  var p = document.getElementById('chatPanel');
-  p.classList.toggle('hidden');
-  if (!p.classList.contains('hidden')) {
-    var q = document.getElementById('chatQuick');
-    q.innerHTML = QUICK_EMOJIS.map(function (e) { return '<span onclick="quickChat(\'' + e + '\')">' + e + '</span>'; }).join('');
+  var dock = document.getElementById('chatDock');
+  dock.classList.toggle('collapsed');
+  if (!dock.classList.contains('collapsed')) {
+    CHAT_UNREAD = 0;
+    updateChatBadge();
+    var box = document.getElementById('chatMsgs');
+    box.scrollTop = box.scrollHeight;
   }
+  if (typeof SND !== 'undefined') SND.play('tap');
+}
+function updateChatBadge() {
+  var b = document.getElementById('chatBadge');
+  if (!b) return;
+  if (CHAT_UNREAD > 0) { b.textContent = CHAT_UNREAD; b.classList.remove('hidden'); }
+  else { b.classList.add('hidden'); }
 }
 function quickChat(t) { document.getElementById('chatText').value = t; sendChat(); }
 function sendChat() {
@@ -1285,21 +1317,27 @@ function sendChat() {
   if (!t || MODE !== 'online') return;
   inp.value = '';
   api('match_chat_send', { match_id: MATCH_ID, text: t });
-  SND.play('tap');
+  if (typeof SND !== 'undefined') SND.play('tap');
 }
 function pollChat() {
   if (MODE !== 'online' || !MATCH_ID) return;
   api('match_chat_get', { match_id: MATCH_ID, after: CHAT_LAST }).then(function (res) {
     if (!res.success || !res.messages.length) return;
     var box = document.getElementById('chatMsgs');
+    var dock = document.getElementById('chatDock');
+    var collapsed = dock && dock.classList.contains('collapsed');
     res.messages.forEach(function (m) {
       CHAT_LAST = m.id;
       var d = document.createElement('div');
       d.className = 'cmsg ' + (m.mine ? 'me' : 'them');
       d.textContent = m.text;
       box.appendChild(d);
-      if (!m.mine) SND.play('chat');
+      if (!m.mine) {
+        if (typeof SND !== 'undefined') SND.play('chat');
+        if (collapsed) { CHAT_UNREAD++; }
+      }
     });
+    updateChatBadge();
     box.scrollTop = box.scrollHeight;
   });
 }
