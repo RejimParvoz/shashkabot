@@ -87,6 +87,44 @@ var mm = getMoves(mb, 2);
 var hasDouble = mm.some(function(m){ return m.captures.length === 2; });
 test('Ikki tosh ketma-ket yutiladi', hasDouble);
 
+console.log('\n7. ORQAGA OLISH (oddiy tosh orqaga yutadi)');
+var bb = [];
+for (var z = 0; z < 8; z++) bb.push([0,0,0,0,0,0,0,0]);
+bb[3][3] = 2;   // oq tosh markazda
+bb[4][4] = 1;   // ORQADAGI raqib (oq pastga = orqaga)
+var bm2 = getMoves(bb, 2);
+var hasBack = bm2.some(function(m){ return m.captures.length === 1 && m.to[0] === 5 && m.to[1] === 5; });
+test('Oq tosh ORQAGA yutadi (3,3)->(5,5)', hasBack);
+// Oddiy tosh ORQAGA oddiy yura olmasligi kerak (faqat yutishda)
+var bb2 = [];
+for (var z2 = 0; z2 < 8; z2++) bb2.push([0,0,0,0,0,0,0,0]);
+bb2[3][3] = 2;
+var moves2 = getMoves(bb2, 2);
+var backwardSimple = moves2.some(function(m){ return m.to[0] > 3; });
+test('Oddiy tosh orqaga ODDIY yura olmaydi', !backwardSimple);
+
+console.log('\n8. UCHUVCHI DAMA');
+var kb = [];
+for (var z3 = 0; z3 < 8; z3++) kb.push([0,0,0,0,0,0,0,0]);
+kb[7][0] = 4;   // oq DAMA burchakda
+var km = getMoves(kb, 2);
+// Dama (7,0) dan (6,1),(5,2),(4,3)... gacha yurishi mumkin
+var farMove = km.some(function(m){ return m.to[0] === 0 && m.to[1] === 7; });
+test('Dama uzoq masofaga yuradi (7,0)->(0,7)', farMove);
+test('Dama bir necha katakka yura oladi', km.length >= 7);
+
+console.log('\n9. DAMA UZOQDAN YUTADI');
+var kc = [];
+for (var z4 = 0; z4 < 8; z4++) kc.push([0,0,0,0,0,0,0,0]);
+kc[7][0] = 4;   // oq dama
+kc[4][3] = 1;   // raqib uzoqda diagonalda
+var kcm = getMoves(kc, 2);
+var kingCap = kcm.some(function(m){ return m.captures.length === 1 && m.captures[0][0] === 4 && m.captures[0][1] === 3; });
+test('Dama uzoqdagi toshni yutadi', kingCap);
+// yutgandan keyin orqasidagi turli kataklarga qo'na oladi
+var landSpots = kcm.filter(function(m){ return m.captures.length === 1; }).length;
+test('Dama yutgach turli joyga qo\'nadi', landSpots >= 2);
+
 console.log('\n========================================');
 console.log('  NATIJA: ' + pass + ' passed, ' + fail + ' failed');
 console.log('========================================');

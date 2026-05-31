@@ -43,31 +43,23 @@ oddiy hostingda muammosiz ishlaydi.
 
 ## ✅ Nima ishlaydi
 
-- **Telegram avto-login** — Mini App ochilganda initData HMAC tekshiruvi
-  bilan avtomatik kirish (parol kerak emas).
+- **Telegram avto-login** — Mini App ochilganda initData HMAC tekshiruvi bilan
+  avtomatik kirish (parol kerak emas).
+- **To'g'ri o'zbek/rus shashka qoidalari:**
+  - Oddiy tosh **oldinga VA orqaga** yutadi (orqaga olish) ✅
+  - **Dama uchuvchi** — diagonal bo'ylab istalgan masofaga yuradi va yutadi ✅
+  - Majburiy yutish, ko'p sakrash (zanjir), damaga aylanish
 - **Bot bilan o'ynash** — 4 daraja (Oson/O'rta/Qiyin/Ekspert), Minimax+Alpha-Beta AI.
-- **Shashka qoidalari** — majburiy yutish, ko'p sakrash (zanjir), damaga aylanish.
-- **Elo reyting** — bot darajasiga qarab o'zgaradi.
-- **Tangalar** — g'alaba +25, durang +10, mag'lubiyat +5.
-- **Reyting jadvali** (top 100) va **Profil** (statistika).
-- **Telegram bot** — `/start`, `/help`, o'yin tugmasi.
-- **Dark/Light tema**.
+- **🌐 Online o'ynash** — boshqa o'yinchilar bilan (server tomon tekshiruvli, polling).
+- **🏪 Do'kon (faqat tanga)** — 5 doska + 5 tosh terilari, sotib olish va tanlash.
+- **🎁 Do'st taklif qilish** — Telegram share havolasi; taklif qilgan +200🪙, yangi +100🪙.
+- **Elo reyting** — bot va online uchun, **Tangalar**, **Reyting jadvali**, **Profil**.
+- **To'liq iOS style** — glassmorphism, segment control, blur, dark/light tema.
 
-## ⚠️ Bu LITE versiya (cheklovlar)
-
-To'liq versiyadagi quyidagilar bu yengil versiyada YO'Q (chunki ular murakkab
-routing/WebSocket talab qiladi):
-- Online multiplayer (faqat bot bilan)
-- Do'kon, Auksion, VIP, Battle Pass, Turnirlar, Arena, Klan
-- Real vaqt chat
-
-> To'liq versiya repozitoriyning asosiy papkasida (`/`), lekin u mod_rewrite
-> talab qiladi. Agar keyinchalik server'da mod_rewrite yoqsangiz, to'liq
-> versiyaga o'tish mumkin.
-
-## 🧪 Testlar
+## 🧪 Testlar (jami 47)
 
 ```bash
-php lite/test_auth.php      # avto-login (12 test)
-node lite/test_engine.js    # o'yin dvigateli (14 test)
+php lite/test_auth.php          # avto-login (12 test)
+php lite/test_engine_php.php    # server dvigatel (15 test)
+node lite/test_engine.js        # klient dvigatel (20 test)
 ```

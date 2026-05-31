@@ -65,9 +65,21 @@ function handleMessage($message) {
     $text = isset($message['text']) ? trim($message['text']) : '';
     $from = isset($message['from']) ? $message['from'] : [];
 
-    // Foydalanuvchini ro'yxatga olish
+    // /start dan referral kodini ajratib olish: "/start 123456"
+    $refCode = null;
+    if (strpos($text, '/start') === 0) {
+        $parts = explode(' ', $text, 2);
+        if (isset($parts[1])) {
+            $param = trim($parts[1]);
+            // "ref_123456" yoki "123456" ko'rinishida
+            $param = str_replace('ref_', '', $param);
+            if (is_numeric($param)) { $refCode = $param; }
+        }
+    }
+
+    // Foydalanuvchini ro'yxatga olish (referral bilan)
     if (!empty($from['id'])) {
-        tgUpsertUser($from);
+        tgUpsertUser($from, $refCode);
     }
 
     if (strpos($text, '/start') === 0) {

@@ -71,25 +71,43 @@ function tgValidateInitData($initData) {
 }
 
 /**
- * Foydalanuvchini bazaga qo'shish yoki yangilash
+ * Foydalanuvchini bazaga qo'shish yoki yangilash.
+ * $refCode - taklif qilgan odamning telegram_id si (ixtiyoriy).
  */
-function tgUpsertUser($tgUser) {
+function tgUpsertUser($tgUser, $refCode = null) {
     require_once __DIR__ . '/db.php';
 
     $existing = dbFirst("SELECT * FROM users WHERE telegram_id = ?", [$tgUser['id']]);
 
     if (!$existing) {
+        // Referralni tekshirish (o'zini taklif qila olmaydi)
+        $referrerTgId = null;
+        if ($refCode !== null && is_numeric($refCode) && (int)$refCode !== (int)$tgUser['id']) {
+            $ref = dbFirst("SELECT telegram_id FROM users WHERE telegram_id = ?", [(int)$refCode]);
+            if ($ref) { $referrerTgId = (int)$refCode; }
+        }
+
         dbInsert(
-            "INSERT INTO users (telegram_id, username, first_name, photo_url, rating, last_active, created_at)
-             VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
+            "INSERT INTO users (telegram_id, username, first_name, photo_url, rating, referred_by, coins, last_active, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
             [
                 $tgUser['id'],
                 isset($tgUser['username']) ? $tgUser['username'] : null,
                 isset($tgUser['first_name']) ? $tgUser['first_name'] : '',
                 isset($tgUser['photo_url']) ? $tgUser['photo_url'] : null,
                 START_RATING,
+                $referrerTgId,
+                $referrerTgId ? 100 : 0,   // yangi foydalanuvchiga xush kelibsiz bonusi
             ]
         );
+
+        // Taklif qilgan odamga mukofot
+        if ($referrerTgId) {
+            dbExec(
+                "UPDATE users SET coins = coins + 200, referral_count = referral_count + 1 WHERE telegram_id = ?",
+                [$referrerTgId]
+            );
+        }
     } else {
         dbExec(
             "UPDATE users SET username = ?, first_name = ?, last_active = NOW() WHERE telegram_id = ?",
