@@ -61,6 +61,7 @@ function publicUser($u) {
         'id' => (int)$u['id'], 'telegram_id' => (int)$u['telegram_id'],
         'username' => $u['username'], 'first_name' => $u['first_name'], 'photo_url' => $u['photo_url'],
         'rating' => (int)$u['rating'], 'coins' => (int)$u['coins'], 'diamonds' => (int)$u['diamonds'],
+        'bot_rating' => isset($u['bot_rating']) ? (int)$u['bot_rating'] : 1000,
         'total_games' => (int)$u['total_games'], 'wins' => (int)$u['wins'],
         'losses' => (int)$u['losses'], 'draws' => (int)$u['draws'],
         'equipped_board' => isset($u['equipped_board']) ? $u['equipped_board'] : 'classic',
@@ -69,7 +70,16 @@ function publicUser($u) {
         'bp_xp' => isset($u['bp_xp']) ? (int)$u['bp_xp'] : 0,
         'bp_premium' => isset($u['bp_premium']) ? (int)$u['bp_premium'] : 0,
         'bp_level' => bpLevelFromXp(isset($u['bp_xp']) ? (int)$u['bp_xp'] : 0),
+        'vip_level' => isset($u['vip_level']) ? $u['vip_level'] : '',
+        'vip_until' => isset($u['vip_until']) ? $u['vip_until'] : null,
+        'is_vip' => isVipActive($u),
     ];
+}
+
+/** VIP faolmi? */
+function isVipActive($u) {
+    if (empty($u['vip_until'])) return false;
+    return strtotime($u['vip_until']) > time();
 }
 
 /** XP dan Battle Pass darajasini hisoblash */
@@ -108,7 +118,7 @@ switch ($action) {
     /* ---------------- ASOSIY ---------------- */
     case 'auth':
         $user = currentUser();
-        jsonResponse(['success' => true, 'user' => publicUser($user)]);
+        jsonResponse(['success' => true, 'user' => publicUser($user), 'bot_username' => defined('BOT_USERNAME') ? BOT_USERNAME : '']);
         break;
 
     case 'profile':
@@ -143,11 +153,12 @@ switch ($action) {
         $moves = isset($in['moves']) ? (int)$in['moves'] : 0;
 
         $ratingChange = calcRatingChange($result, $botLevel);
-        $newRating = max(100, (int)$user['rating'] + $ratingChange);
+        $botRating = isset($user['bot_rating']) ? (int)$user['bot_rating'] : 1000;
+        $newRating = max(100, $botRating + $ratingChange);
         $coins = ($result === 'win') ? WIN_COINS : (($result === 'draw') ? DRAW_COINS : LOSS_COINS);
 
         dbExec(
-            "UPDATE users SET rating = ?, coins = coins + ?, total_games = total_games + 1,
+            "UPDATE users SET bot_rating = ?, coins = coins + ?, total_games = total_games + 1,
              wins = wins + ?, losses = losses + ?, draws = draws + ?, last_active = NOW() WHERE id = ?",
             [$newRating, $coins, $result==='win'?1:0, $result==='loss'?1:0, $result==='draw'?1:0, $user['id']]
         );
@@ -157,6 +168,7 @@ switch ($action) {
             [$user['id'], $mode, $botLevel, $result, $moves, $ratingChange]
         );
         awardXp($user['id'], $result);
+        tournamentPoints($user['id'], $result);
         $updated = dbFirst("SELECT * FROM users WHERE id = ?", [$user['id']]);
         jsonResponse(['success' => true, 'rating_change' => $ratingChange, 'coins_earned' => $coins, 'user' => publicUser($updated)]);
         break;
@@ -309,6 +321,7 @@ switch ($action) {
             'move_count' => (int)$m['move_count'],
             'last_from' => $m['last_from'],
             'last_to' => $m['last_to'],
+            'draw_offer' => (int)$m['draw_offer'],
             'opponent' => $opp,
         ]);
         break;
@@ -510,6 +523,147 @@ switch ($action) {
         jsonResponse(['success' => true, 'match_id' => (int)$m['id']]);
         break;
 
+    /* ---------------- TURNIRLAR ---------------- */
+    case 'tournament_list':
+        $user = currentUser();
+        ensureTournaments();
+        $ts = dbAll("SELECT * FROM tournaments WHERE status = 'active' ORDER BY FIELD(type,'daily','weekly','monthly')");
+        $out = [];
+        foreach ($ts as $t) {
+            $joined = dbFirst("SELECT score FROM tournament_players WHERE tournament_id = ? AND user_id = ?", [$t['id'], $user['id']]);
+            $players = dbFirst("SELECT COUNT(*) AS c FROM tournament_players WHERE tournament_id = ?", [$t['id']]);
+            $out[] = [
+                'id' => (int)$t['id'], 'type' => $t['type'], 'title' => $t['title'],
+                'ends_at' => $t['ends_at'], 'ends_ts' => strtotime($t['ends_at']),
+                'prize1' => (int)$t['prize1'], 'prize2' => (int)$t['prize2'], 'prize3' => (int)$t['prize3'],
+                'joined' => $joined ? true : false,
+                'my_score' => $joined ? (int)$joined['score'] : 0,
+                'players' => (int)$players['c'],
+            ];
+        }
+        jsonResponse(['success' => true, 'tournaments' => $out, 'server_ts' => time()]);
+        break;
+
+    case 'tournament_join':
+        $user = currentUser();
+        $in = input();
+        $tid = (int)(isset($in['tournament_id']) ? $in['tournament_id'] : 0);
+        $t = dbFirst("SELECT * FROM tournaments WHERE id = ? AND status = 'active'", [$tid]);
+        if (!$t) jsonResponse(['success' => false, 'error' => 'Turnir topilmadi'], 404);
+        dbExec("INSERT IGNORE INTO tournament_players (tournament_id, user_id, score, joined_at) VALUES (?, ?, 0, NOW())", [$tid, $user['id']]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'tournament_top':
+        $user = currentUser();
+        $in = input();
+        $tid = (int)(isset($in['tournament_id']) ? $in['tournament_id'] : 0);
+        $rows = dbAll(
+            "SELECT tp.score, u.telegram_id, u.first_name, u.username, u.photo_url, u.rating
+             FROM tournament_players tp INNER JOIN users u ON tp.user_id = u.id
+             WHERE tp.tournament_id = ? ORDER BY tp.score DESC, u.rating DESC LIMIT 20",
+            [$tid]
+        );
+        $rank = 1;
+        foreach ($rows as &$r) { $r['rank'] = $rank++; $r['score'] = (int)$r['score']; }
+        unset($r);
+        jsonResponse(['success' => true, 'top' => $rows]);
+        break;
+
+    /* ---------------- VIP ---------------- */
+    case 'vip_buy':
+        $user = currentUser();
+        $in = input();
+        $level = isset($in['level']) ? $in['level'] : '';
+        $plans = vipPlans();
+        if (!isset($plans[$level])) jsonResponse(['success' => false, 'error' => 'Reja topilmadi'], 404);
+        $payload = 'vip_' . $user['telegram_id'] . '_' . $level;
+        $link = tgCreateInvoiceLink('👑 VIP ' . ucfirst($level), 'VIP obuna (30 kun)', $payload, $plans[$level]['stars']);
+        if (!$link) jsonResponse(['success' => false, 'error' => 'Invoice yaratilmadi'], 500);
+        jsonResponse(['success' => true, 'invoice' => $link]);
+        break;
+
+    case 'vip_info':
+        $user = currentUser();
+        jsonResponse([
+            'success' => true,
+            'is_vip' => isVipActive($user),
+            'level' => $user['vip_level'],
+            'until' => $user['vip_until'],
+            'can_claim' => isVipActive($user) && $user['vip_claim_date'] !== date('Y-m-d'),
+            'plans' => vipPlans(),
+        ]);
+        break;
+
+    case 'vip_claim':
+        $user = currentUser();
+        if (!isVipActive($user)) jsonResponse(['success' => false, 'error' => 'VIP faol emas'], 400);
+        if ($user['vip_claim_date'] === date('Y-m-d')) jsonResponse(['success' => false, 'error' => 'Bugun olib bo\'lingan'], 400);
+        $amt = vipDailyAmount($user['vip_level']);
+        dbExec("UPDATE users SET diamonds = diamonds + ?, vip_claim_date = ? WHERE id = ?", [$amt, date('Y-m-d'), $user['id']]);
+        $updated = dbFirst("SELECT * FROM users WHERE id = ?", [$user['id']]);
+        jsonResponse(['success' => true, 'diamonds' => (int)$updated['diamonds'], 'claimed' => $amt]);
+        break;
+
+    /* ---------------- O'YIN CHATI ---------------- */
+    case 'match_chat_send':
+        $user = currentUser();
+        $in = input();
+        $mid = (int)(isset($in['match_id']) ? $in['match_id'] : 0);
+        $text = trim(isset($in['text']) ? $in['text'] : '');
+        if ($text === '') jsonResponse(['success' => false, 'error' => 'Bo\'sh'], 400);
+        if (mb_strlen($text) > 200) $text = mb_substr($text, 0, 200);
+        $m = dbFirst("SELECT p1_id, p2_id FROM matches WHERE id = ?", [$mid]);
+        if (!$m || ((int)$m['p1_id'] !== (int)$user['id'] && (int)$m['p2_id'] !== (int)$user['id'])) {
+            jsonResponse(['success' => false, 'error' => 'Ruxsat yo\'q'], 403);
+        }
+        dbInsert("INSERT INTO match_chat (match_id, user_id, text, created_at) VALUES (?, ?, ?, NOW())", [$mid, $user['id'], $text]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'match_chat_get':
+        $user = currentUser();
+        $in = input();
+        $mid = (int)(isset($in['match_id']) ? $in['match_id'] : 0);
+        $after = (int)(isset($in['after']) ? $in['after'] : 0);
+        $rows = dbAll(
+            "SELECT id, user_id, text FROM match_chat WHERE match_id = ? AND id > ? ORDER BY id ASC LIMIT 50",
+            [$mid, $after]
+        );
+        foreach ($rows as &$r) { $r['mine'] = ((int)$r['user_id'] === (int)$user['id']); $r['id'] = (int)$r['id']; }
+        unset($r);
+        jsonResponse(['success' => true, 'messages' => $rows]);
+        break;
+
+    /* ---------------- DURANG SO'ROVI ---------------- */
+    case 'match_draw_offer':
+        $user = currentUser();
+        $in = input();
+        $mid = (int)(isset($in['match_id']) ? $in['match_id'] : 0);
+        $m = dbFirst("SELECT * FROM matches WHERE id = ?", [$mid]);
+        if (!$m || $m['status'] !== 'active') jsonResponse(['success' => false, 'error' => 'Faol emas'], 400);
+        $who = ((int)$m['p1_id'] === (int)$user['id']) ? 1 : 2;
+        dbExec("UPDATE matches SET draw_offer = ? WHERE id = ?", [$who, $mid]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'match_draw_respond':
+        $user = currentUser();
+        $in = input();
+        $mid = (int)(isset($in['match_id']) ? $in['match_id'] : 0);
+        $accept = !empty($in['accept']);
+        $m = dbFirst("SELECT * FROM matches WHERE id = ?", [$mid]);
+        if (!$m || $m['status'] !== 'active') jsonResponse(['success' => false, 'error' => 'Faol emas'], 400);
+        if ($accept) {
+            dbExec("UPDATE matches SET status = 'finished', winner_id = NULL, draw_offer = 0 WHERE id = ?", [$mid]);
+            finishMatch($m, null);
+            jsonResponse(['success' => true, 'draw' => true]);
+        } else {
+            dbExec("UPDATE matches SET draw_offer = 0 WHERE id = ?", [$mid]);
+            jsonResponse(['success' => true, 'draw' => false]);
+        }
+        break;
+
     default:
         jsonResponse(['success' => false, 'error' => 'Noma\'lum action'], 404);
 }
@@ -523,6 +677,93 @@ function diamondPacks() {
         ['id' => 'p4', 'diamonds' => 2800, 'stars' => 200],
         ['id' => 'p5', 'diamonds' => 6000, 'stars' => 380],
     ];
+}
+
+/* ============== TURNIR MANTIG'I ============== */
+
+/** Davr chegaralari (start, end) DATETIME */
+function periodBounds($type) {
+    $now = time();
+    if ($type === 'daily') {
+        $start = strtotime(date('Y-m-d 00:00:00'));
+        $end = $start + 86400;
+        $title = 'Kunlik turnir';
+    } elseif ($type === 'weekly') {
+        $dow = (int)date('N'); // 1=Mon
+        $start = strtotime(date('Y-m-d 00:00:00', $now - ($dow - 1) * 86400));
+        $end = $start + 7 * 86400;
+        $title = 'Haftalik turnir';
+    } else { // monthly
+        $start = strtotime(date('Y-m-01 00:00:00'));
+        $end = strtotime(date('Y-m-01 00:00:00', strtotime('+1 month', $start)));
+        $title = 'Oylik turnir';
+    }
+    return [date('Y-m-d H:i:s', $start), date('Y-m-d H:i:s', $end), $title];
+}
+
+/** Faol turnirlarni yaratish va eskirganlarini yakunlash */
+function ensureTournaments() {
+    // eskirganlarni yakunlash
+    $expired = dbAll("SELECT * FROM tournaments WHERE status = 'active' AND ends_at <= NOW()");
+    foreach ($expired as $t) { finalizeTournament($t); }
+
+    $prizes = [
+        'daily' => [50, 30, 20],
+        'weekly' => [150, 90, 60],
+        'monthly' => [500, 300, 150],
+    ];
+    foreach (['daily', 'weekly', 'monthly'] as $type) {
+        list($start, $end, $title) = periodBounds($type);
+        $exists = dbFirst("SELECT id FROM tournaments WHERE type = ? AND starts_at = ?", [$type, $start]);
+        if (!$exists) {
+            dbExec(
+                "INSERT IGNORE INTO tournaments (type, title, starts_at, ends_at, status, prize1, prize2, prize3, created_at)
+                 VALUES (?, ?, ?, ?, 'active', ?, ?, ?, NOW())",
+                [$type, $title, $start, $end, $prizes[$type][0], $prizes[$type][1], $prizes[$type][2]]
+            );
+        }
+    }
+}
+
+/** Turnirni yakunlash va top 3 ga mukofot */
+function finalizeTournament($t) {
+    $top = dbAll(
+        "SELECT user_id, score FROM tournament_players WHERE tournament_id = ? AND score > 0 ORDER BY score DESC, joined_at ASC LIMIT 3",
+        [$t['id']]
+    );
+    $prizes = [(int)$t['prize1'], (int)$t['prize2'], (int)$t['prize3']];
+    foreach ($top as $i => $p) {
+        if ($prizes[$i] > 0) {
+            dbExec("UPDATE users SET diamonds = diamonds + ? WHERE id = ?", [$prizes[$i], $p['user_id']]);
+        }
+    }
+    dbExec("UPDATE tournaments SET status = 'finished' WHERE id = ?", [$t['id']]);
+}
+
+/** G'alaba/durang uchun turnir ochkolari (qo'shilgan turnirlarga) */
+function tournamentPoints($userId, $result) {
+    $pts = ($result === 'win') ? 3 : (($result === 'draw') ? 1 : 0);
+    if ($pts === 0) return;
+    $active = dbAll("SELECT id FROM tournaments WHERE status = 'active' AND starts_at <= NOW() AND ends_at > NOW()");
+    foreach ($active as $t) {
+        dbExec(
+            "UPDATE tournament_players SET score = score + ? WHERE tournament_id = ? AND user_id = ?",
+            [$pts, $t['id'], $userId]
+        );
+    }
+}
+
+/* ============== VIP ============== */
+function vipPlans() {
+    return [
+        'bronze' => ['stars' => 75, 'daily' => 10, 'name' => 'Bronze'],
+        'gold' => ['stars' => 200, 'daily' => 30, 'name' => 'Gold'],
+        'platinum' => ['stars' => 450, 'daily' => 75, 'name' => 'Platinum'],
+    ];
+}
+function vipDailyAmount($level) {
+    $p = vipPlans();
+    return isset($p[$level]) ? $p[$level]['daily'] : 0;
 }
 
 /** Online o'yin tugagach ikkala o'yinchining statistikasini yangilash */
@@ -562,4 +803,5 @@ function updatePlayer($u, $ratingChange, $coins, $result, $m) {
         [$u['id'], $result, (int)$m['move_count'], $ratingChange]
     );
     awardXp($u['id'], $result);
+    tournamentPoints($u['id'], $result);
 }

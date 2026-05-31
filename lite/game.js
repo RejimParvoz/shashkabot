@@ -64,6 +64,9 @@ function nav(page) {
   if (page === 'profile') loadProfile();
   if (page === 'shop') loadShop();
   if (page === 'bp') loadBP();
+  if (page === 'tour') loadTour();
+  if (page === 'vip') loadVip();
+  if (typeof SND !== 'undefined') SND.play('tap');
 }
 
 function toast(msg) {
@@ -109,6 +112,7 @@ function init() {
   api('auth', {}).then(function (res) {
     if (res.success) {
       USER = res.user;
+      if (res.bot_username) { INVITE_BOT = res.bot_username; }
       renderUser();
       var code = (typeof JOIN_CODE !== 'undefined' && JOIN_CODE) ? JOIN_CODE : '';
       if (!code && START_PARAM && START_PARAM.indexOf('match_') === 0) {
@@ -118,19 +122,28 @@ function init() {
     } else {
       toast('Avtorizatsiya: ' + (res.error || 'xato'));
     }
-    document.getElementById('loader').style.display = 'none';
+    hideLoader();
   }).catch(function () {
-    document.getElementById('loader').style.display = 'none';
+    hideLoader();
     toast('Serverga ulanib bolmadi');
   });
+}
+
+function hideLoader() {
+  var el = document.getElementById('loader');
+  if (!el) return;
+  el.classList.add('hide');
+  setTimeout(function () { el.style.display = 'none'; }, 450);
 }
 
 function loadProfile() {
   api('profile', {}).then(function (res) {
     if (!res.success) return;
     var p = res.profile;
-    document.getElementById('pName').textContent = p.first_name || 'Mehmon';
+    var crown = p.is_vip ? '👑 ' : '';
+    document.getElementById('pName').textContent = crown + (p.first_name || 'Mehmon');
     document.getElementById('pRating').textContent = p.rating;
+    document.getElementById('pBotRating').textContent = p.bot_rating;
     document.getElementById('pRank').textContent = p.rank;
     document.getElementById('pGames').textContent = p.total_games;
     document.getElementById('pWins').textContent = p.wins;
@@ -140,10 +153,11 @@ function loadProfile() {
     document.getElementById('pCoins').textContent = p.coins;
     document.getElementById('pRefs').textContent = p.referral_count || 0;
     if (p.photo_url) document.getElementById('pAvatar').src = p.photo_url;
-    // skinlarni yangilash
     USER.equipped_board = p.equipped_board;
     USER.equipped_piece = p.equipped_piece;
     USER.coins = p.coins;
+    USER.diamonds = p.diamonds;
+    renderUser();
   });
 }
 
@@ -255,6 +269,9 @@ function startGame(mode) {
   document.getElementById('oppName').textContent = '🤖 Bot (' + names[botLevel] + ')';
   document.getElementById('meName').textContent = '😎 Siz';
   document.getElementById('oppDot').classList.remove('on');
+  document.getElementById('drawBtn').classList.add('hidden');
+  document.getElementById('chatBtn').classList.add('hidden');
+  document.getElementById('chatPanel').classList.add('hidden');
   nav('game');
   setupCanvas();
   render();
@@ -323,12 +340,33 @@ function drawPiece(r, c, p) {
   var x = d.c * CELL + CELL / 2, y = d.r * CELL + CELL / 2, rad = CELL * 0.36;
   var white = (p === 2 || p === 4), king = (p === 3 || p === 4);
   var th = pieceTheme(); // [oqG1, oqG2, qoraG1, qoraG2]
+  var premiumPieces = ['piece_diamond', 'piece_ruby', 'piece_royal'];
+  var isPrem = USER && premiumPieces.indexOf(USER.equipped_piece) >= 0;
+
+  // soya
   ctx.beginPath(); ctx.arc(x, y + 2, rad, 0, 7); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fill();
+
+  // premium porlash (glow)
+  if (isPrem) {
+    ctx.save();
+    ctx.shadowColor = white ? th[1] : th[2];
+    ctx.shadowBlur = CELL * 0.22;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = white ? th[1] : th[2]; ctx.fill();
+    ctx.restore();
+  }
+
   var g = ctx.createRadialGradient(x - rad / 3, y - rad / 3, rad / 4, x, y, rad);
   if (white) { g.addColorStop(0, th[0]); g.addColorStop(1, th[1]); }
   else { g.addColorStop(0, th[2]); g.addColorStop(1, th[3]); }
   ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fillStyle = g; ctx.fill();
   ctx.lineWidth = 2; ctx.strokeStyle = white ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.25)'; ctx.stroke();
+
+  // yaltiroq nuqta (premium his)
+  ctx.beginPath();
+  ctx.arc(x - rad * 0.32, y - rad * 0.32, rad * 0.28, 0, 7);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fill();
+
   if (king) {
     ctx.fillStyle = '#ffd60a';
     ctx.font = (rad * 1.15) + 'px serif';
@@ -515,6 +553,7 @@ function doMove(mv, isHuman) {
   SELECTED = null; LEGAL = [];
   render();
   updateCounts();
+  if (typeof SND !== 'undefined') SND.play(mv.captures && mv.captures.length ? 'capture' : 'move');
 
   var over = checkOver();
   if (over) { finish(over); return; }
@@ -653,6 +692,7 @@ function finish(result) {
 }
 
 function showResult(result, ratingChange, coins) {
+  if (typeof SND !== 'undefined') SND.play(result === 'win' ? 'win' : (result === 'draw' ? 'draw' : 'lose'));
   var emoji = result === 'win' ? '\uD83C\uDFC6' : (result === 'draw' ? '\uD83E\uDD1D' : '\uD83D\uDE14');
   var title = result === 'win' ? "G'alaba!" : (result === 'draw' ? 'Durang!' : "Mag'lubiyat");
   var rcCls = ratingChange >= 0 ? 'up' : 'down';
@@ -731,6 +771,12 @@ function enterOnline() {
     document.getElementById('oppName').textContent = '👤 ' + oppName;
     document.getElementById('meName').textContent = '😎 Siz';
     document.getElementById('oppDot').classList.add('on');
+    // chat va durang tugmalarini ko'rsatish
+    document.getElementById('drawBtn').classList.remove('hidden');
+    document.getElementById('chatBtn').classList.remove('hidden');
+    document.getElementById('chatPanel').classList.add('hidden');
+    document.getElementById('chatMsgs').innerHTML = '';
+    CHAT_LAST = 0; DRAW_SHOWN = false;
     nav('game');
     setupCanvas();
     applyOnline(s);
@@ -745,11 +791,16 @@ function pollOnline() {
   if (MODE !== 'online' || GAME_OVER) { stopPoll(); return; }
   api('match_state', { match_id: MATCH_ID }).then(function (s) {
     if (!s.success) return;
+    pollChat();
     if (s.status === 'finished') {
       applyOnline(s);
       onlineFinished(s);
-    } else if (s.move_count !== ONLINE_MC) {
-      applyOnline(s);
+    } else {
+      if (typeof s.draw_offer !== 'undefined') checkDrawOffer(s.draw_offer);
+      if (s.move_count !== ONLINE_MC) {
+        applyOnline(s);
+        if (typeof SND !== 'undefined') SND.play('move');
+      }
     }
   });
 }
@@ -778,7 +829,7 @@ function sendOnlineMove(mv) {
     ONLINE_MC++;
     render();
     updateCounts();
-    window.App && window.App.sound && window.App.sound.play('move');
+    if (typeof SND !== 'undefined') SND.play(mv.captures && mv.captures.length ? 'capture' : 'move');
     if (res.finished) {
       api('match_state', { match_id: MATCH_ID }).then(onlineFinished);
     } else {
@@ -851,7 +902,7 @@ function renderShop() {
   });
   if (!items.length) { grid.innerHTML = '<div class="muted" style="padding:16px;">Bo\'sh</div>'; return; }
   grid.innerHTML = items.map(function (it) {
-    return '<div class="shop-item">' +
+    return '<div class="shop-item' + (it.premium ? ' prem' : '') + '">' +
       (it.equipped ? '<span class="tag eq">Tanlangan</span>' : (it.owned ? '<span class="tag">Bor</span>' : '')) +
       shopPreview(it) +
       '<div class="nm">' + escapeHtml(it.name) + '</div>' +
@@ -862,14 +913,31 @@ function renderShop() {
 
 function shopPreview(it) {
   var d = it.data.split(',');
+  var prem = it.premium === 1;
   if (it.type === 'board') {
-    return '<div class="shop-prev" style="background:repeating-conic-gradient(#' + d[0] +
-      ' 0% 25%, #' + d[1] + ' 0% 50%);background-size:34px 34px;"></div>';
+    // 4x4 mini doska (SVG)
+    var l = '#' + d[0], dk = '#' + d[1], cells = '';
+    for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) {
+      var dark = (r + c) % 2 === 1;
+      cells += '<rect x="' + (c * 16) + '" y="' + (r * 16) + '" width="16" height="16" fill="' + (dark ? dk : l) + '"/>';
+    }
+    var star = prem ? '<text x="56" y="14" font-size="12">✦</text>' : '';
+    return '<div class="shop-prev"><svg viewBox="0 0 64 64" width="70" height="70">' +
+      '<defs><clipPath id="cb"><rect x="0" y="0" width="64" height="64" rx="10"/></clipPath></defs>' +
+      '<g clip-path="url(#cb)">' + cells + '</g>' +
+      '<rect x="0.5" y="0.5" width="63" height="63" rx="10" fill="none" stroke="rgba(0,0,0,.15)"/>' + star + '</svg></div>';
   }
-  return '<div class="shop-prev" style="background:var(--bg);gap:8px;">' +
-    '<span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#' + d[0] + ',#' + d[1] + ');display:inline-block;"></span>' +
-    '<span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#' + d[2] + ',#' + d[3] + ');display:inline-block;"></span>' +
-    '</div>';
+  // toshlar (SVG): oq va qora doira + premium toj/yarq
+  var uid = 'p' + Math.random().toString(36).substr(2, 5);
+  var crown = prem ? '<text x="46" y="26" font-size="13" fill="#ffd60a">♛</text>' : '';
+  return '<div class="shop-prev"><svg viewBox="0 0 64 40" width="84" height="54">' +
+    '<defs>' +
+    '<radialGradient id="w' + uid + '" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#' + d[0] + '"/><stop offset="1" stop-color="#' + d[1] + '"/></radialGradient>' +
+    '<radialGradient id="b' + uid + '" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#' + d[2] + '"/><stop offset="1" stop-color="#' + d[3] + '"/></radialGradient>' +
+    '</defs>' +
+    '<circle cx="20" cy="20" r="15" fill="url(#w' + uid + ')" stroke="rgba(0,0,0,.2)"/>' +
+    '<circle cx="44" cy="20" r="15" fill="url(#b' + uid + ')" stroke="rgba(255,255,255,.15)"/>' +
+    crown + '</svg></div>';
 }
 
 function shopBtn(it) {
@@ -1060,3 +1128,209 @@ function inviteFriend() {
   });
 }
 
+
+
+/* ==================== OVOZ EFFEKTLARI (Web Audio) ==================== */
+var SND = {
+  ctx: null,
+  on: (localStorage.getItem('snd') !== '0'),
+  ac: function () {
+    if (!this.ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    return this.ctx;
+  },
+  beep: function (freq, dur, type, vol) {
+    if (!this.on) return;
+    var c = this.ac(); if (!c) return;
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.12, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + (dur || 0.15));
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + (dur || 0.15));
+  },
+  play: function (kind) {
+    if (!this.on) return;
+    switch (kind) {
+      case 'move': this.beep(330, 0.09, 'sine', 0.1); break;
+      case 'capture': this.beep(180, 0.14, 'square', 0.12); setTimeout(function(){SND.beep(120,0.12,'square',0.1);},60); break;
+      case 'tap': this.beep(520, 0.05, 'sine', 0.07); break;
+      case 'chat': this.beep(660, 0.08, 'triangle', 0.09); break;
+      case 'win': this.beep(523,0.12,'sine',0.13); setTimeout(function(){SND.beep(659,0.12,'sine',0.13);},120); setTimeout(function(){SND.beep(784,0.2,'sine',0.13);},240); break;
+      case 'lose': this.beep(300,0.18,'sine',0.12); setTimeout(function(){SND.beep(200,0.3,'sine',0.12);},160); break;
+      case 'draw': this.beep(440,0.12,'sine',0.1); setTimeout(function(){SND.beep(440,0.12,'sine',0.1);},150); break;
+      case 'king': this.beep(700,0.1,'triangle',0.12); setTimeout(function(){SND.beep(950,0.14,'triangle',0.12);},90); break;
+    }
+  },
+  toggle: function () { this.on = !this.on; localStorage.setItem('snd', this.on ? '1' : '0'); return this.on; }
+};
+
+/* ==================== TURNIRLAR ==================== */
+var TOUR_TIMER = null;
+function loadTour() {
+  api('tournament_list', {}).then(function (res) {
+    if (!res.success) return;
+    var skew = Date.now() / 1000 - res.server_ts;
+    var html = res.tournaments.map(function (t) {
+      return '<div class="tcard" data-ends="' + t.ends_ts + '">' +
+        '<div class="th"><div><div class="tt">' + tourIcon(t.type) + ' ' + t.title + '</div>' +
+        '<div class="tm">' + t.players + ' ishtirokchi • tugashiga <span class="countdown" data-ends="' + t.ends_ts + '">--</span></div></div>' +
+        (t.joined ? '<div class="tprize g1">Siz: ' + t.my_score + '</div>'
+          : '<button class="btn sm grad" style="width:auto;" onclick="joinTour(' + t.id + ')">Qatnashish</button>') +
+        '</div>' +
+        '<div class="tprizes"><div class="tprize g1">🥇 ' + t.prize1 + '💎</div>' +
+        '<div class="tprize g2">🥈 ' + t.prize2 + '💎</div><div class="tprize g3">🥉 ' + t.prize3 + '💎</div></div>' +
+        '<div id="ttop' + t.id + '"></div>' +
+        '<div class="tm" style="cursor:pointer;color:var(--accent);" onclick="loadTourTop(' + t.id + ')">Reytingni ko\'rish ▾</div>' +
+        '</div>';
+    }).join('');
+    document.getElementById('tourList').innerHTML = html || '<div class="muted" style="padding:16px;">Turnir yo\'q</div>';
+    startCountdowns(skew);
+  });
+}
+function tourIcon(t) { return t === 'daily' ? '📅' : (t === 'weekly' ? '🗓️' : '🏆'); }
+function joinTour(id) {
+  SND.play('tap');
+  api('tournament_join', { tournament_id: id }).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    toast('Turnirga qo\'shildingiz! G\'alaba qozoning 🏆');
+    loadTour();
+  });
+}
+function loadTourTop(id) {
+  api('tournament_top', { tournament_id: id }).then(function (res) {
+    if (!res.success) return;
+    var el = document.getElementById('ttop' + id);
+    if (!res.top.length) { el.innerHTML = '<div class="tm">Hali ishtirokchi yo\'q</div>'; return; }
+    el.innerHTML = res.top.map(function (u) {
+      return '<div class="ttop"><div class="r">' + u.rank + '</div>' +
+        '<div class="nm">' + escapeHtml(u.first_name || 'Player') + '</div>' +
+        '<div class="sc">' + u.score + '</div></div>';
+    }).join('');
+  });
+}
+function startCountdowns(skew) {
+  if (TOUR_TIMER) clearInterval(TOUR_TIMER);
+  function tick() {
+    var now = Date.now() / 1000 - (skew || 0);
+    document.querySelectorAll('.countdown').forEach(function (el) {
+      var left = Math.max(0, Math.floor(el.getAttribute('data-ends') - now));
+      var d = Math.floor(left / 86400), h = Math.floor((left % 86400) / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
+      el.textContent = (d > 0 ? d + 'k ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s);
+    });
+  }
+  tick(); TOUR_TIMER = setInterval(tick, 1000);
+}
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+/* ==================== VIP ==================== */
+function loadVip() {
+  api('vip_info', {}).then(function (res) {
+    if (!res.success) return;
+    var st = document.getElementById('vipStatus');
+    if (res.is_vip) {
+      st.innerHTML = '<div style="font-size:34px;">👑</div><h3 style="font-size:18px;">VIP ' + (res.level ? res.level.toUpperCase() : '') + '</h3>' +
+        '<div class="muted">Tugaydi: ' + (res.until || '').substring(0, 10) + '</div>' +
+        (res.can_claim ? '<button class="btn gold" style="margin-top:12px;" onclick="claimVip()">🎁 Kunlik olmosni olish</button>'
+          : '<div class="muted" style="margin-top:10px;">Bugungi bonus olingan ✅</div>');
+    } else {
+      st.innerHTML = '<div style="font-size:34px;">👑</div><div class="muted">Sizda VIP yo\'q. Quyidan tanlang.</div>';
+    }
+    var plans = res.plans;
+    var order = ['bronze', 'gold', 'platinum'];
+    document.getElementById('vipPlans').innerHTML = order.map(function (k) {
+      var p = plans[k]; if (!p) return '';
+      return '<div class="vipcard ' + k + '"><div class="vt">' + crownFor(k) + ' VIP ' + p.name + '</div>' +
+        '<div class="vd">Kunlik ' + p.daily + ' 💎 • 30 kun</div>' +
+        '<button class="btn" style="background:rgba(0,0,0,.25);color:#fff;" onclick="buyVip(\'' + k + '\')">' + p.stars + ' ⭐ sotib olish</button></div>';
+    }).join('');
+  });
+}
+function crownFor(k) { return k === 'platinum' ? '💎' : (k === 'gold' ? '👑' : '🥉'); }
+function buyVip(level) {
+  SND.play('tap');
+  api('vip_buy', { level: level }).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    if (tg && tg.openInvoice) {
+      tg.openInvoice(res.invoice, function (s) { if (s === 'paid') { toast('VIP faollashtirildi! 👑'); setTimeout(loadVip, 1500); } });
+    } else { toast('Telegram orqali oching'); }
+  });
+}
+function claimVip() {
+  api('vip_claim', {}).then(function (res) {
+    if (!res.success) { toast(res.error || 'Xato'); return; }
+    USER.diamonds = res.diamonds; renderUser();
+    toast('+' + res.claimed + ' 💎 olindi!'); SND.play('win');
+    loadVip();
+  });
+}
+
+/* ==================== O'YIN CHATI ==================== */
+var CHAT_LAST = 0;
+var QUICK_EMOJIS = ['👍', '😅', '🔥', '😮', '🤝', 'GG', 'Salom'];
+function toggleChat() {
+  var p = document.getElementById('chatPanel');
+  p.classList.toggle('hidden');
+  if (!p.classList.contains('hidden')) {
+    var q = document.getElementById('chatQuick');
+    q.innerHTML = QUICK_EMOJIS.map(function (e) { return '<span onclick="quickChat(\'' + e + '\')">' + e + '</span>'; }).join('');
+  }
+}
+function quickChat(t) { document.getElementById('chatText').value = t; sendChat(); }
+function sendChat() {
+  var inp = document.getElementById('chatText');
+  var t = inp.value.trim();
+  if (!t || MODE !== 'online') return;
+  inp.value = '';
+  api('match_chat_send', { match_id: MATCH_ID, text: t });
+  SND.play('tap');
+}
+function pollChat() {
+  if (MODE !== 'online' || !MATCH_ID) return;
+  api('match_chat_get', { match_id: MATCH_ID, after: CHAT_LAST }).then(function (res) {
+    if (!res.success || !res.messages.length) return;
+    var box = document.getElementById('chatMsgs');
+    res.messages.forEach(function (m) {
+      CHAT_LAST = m.id;
+      var d = document.createElement('div');
+      d.className = 'cmsg ' + (m.mine ? 'me' : 'them');
+      d.textContent = m.text;
+      box.appendChild(d);
+      if (!m.mine) SND.play('chat');
+    });
+    box.scrollTop = box.scrollHeight;
+  });
+}
+
+/* ==================== DURANG ==================== */
+function offerDraw() {
+  if (MODE !== 'online') return;
+  api('match_draw_offer', { match_id: MATCH_ID }).then(function () { toast('Durang taklif qilindi'); });
+}
+var DRAW_SHOWN = false;
+function checkDrawOffer(offerWho) {
+  // offerWho: 1=p1, 2=p2; mening rangim MY_COLOR (2=p1, 1=p2)
+  var iAmP1 = (MY_COLOR === 2);
+  var offeredByOpponent = (iAmP1 && offerWho === 2) || (!iAmP1 && offerWho === 1);
+  if (offeredByOpponent && !DRAW_SHOWN && !GAME_OVER) {
+    DRAW_SHOWN = true;
+    if (confirm('Raqib durang taklif qildi. Qabul qilasizmi?')) {
+      api('match_draw_respond', { match_id: MATCH_ID, accept: true }).then(function () { /* poll yakunlaydi */ });
+    } else {
+      api('match_draw_respond', { match_id: MATCH_ID, accept: false });
+    }
+    setTimeout(function () { DRAW_SHOWN = false; }, 5000);
+  }
+}
+
+
+/* Ovozni yoqish/o'chirish */
+function toggleSound() {
+  var on = SND.toggle();
+  var btn = document.getElementById('sndBtn');
+  if (btn) btn.textContent = on ? '🔊 Ovoz' : '🔇 Ovoz';
+  if (on) SND.play('tap');
+  toast(on ? 'Ovoz yoqildi' : 'Ovoz o\'chirildi');
+}

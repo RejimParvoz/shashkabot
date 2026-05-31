@@ -98,6 +98,15 @@ function handlePayment($message) {
         dbInsert("INSERT INTO payments (charge_id, user_id, kind, amount, stars, created_at) VALUES (?, ?, 'bp_premium', 1, ?, NOW())",
             [$chargeId, $user['id'], $stars]);
         tg('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Battle Pass Premium ochildi! 🎟"]);
+    } elseif ($parts[0] === 'vip' && isset($parts[2])) {
+        $level = $parts[2];
+        // mavjud VIP ustiga 30 kun qo'shamiz
+        $base = (!empty($user['vip_until']) && strtotime($user['vip_until']) > time()) ? strtotime($user['vip_until']) : time();
+        $until = date('Y-m-d H:i:s', $base + 30 * 86400);
+        dbExec("UPDATE users SET vip_until = ?, vip_level = ? WHERE id = ?", [$until, $level, $user['id']]);
+        dbInsert("INSERT INTO payments (charge_id, user_id, kind, amount, stars, created_at) VALUES (?, ?, 'vip', 1, ?, NOW())",
+            [$chargeId, $user['id'], $stars]);
+        tg('sendMessage', ['chat_id' => $chatId, 'text' => "👑 VIP " . ucfirst($level) . " faollashtirildi! (30 kun)"]);
     }
 }
 

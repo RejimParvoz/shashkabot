@@ -211,6 +211,61 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ", "payments jadvali");
 
+    // ---- VIP ustunlari ----
+    tryExec("ALTER TABLE `users` ADD COLUMN `vip_until` DATETIME DEFAULT NULL", "users.vip_until");
+    tryExec("ALTER TABLE `users` ADD COLUMN `vip_level` VARCHAR(10) NOT NULL DEFAULT ''", "users.vip_level");
+    tryExec("ALTER TABLE `users` ADD COLUMN `vip_claim_date` DATE DEFAULT NULL", "users.vip_claim_date");
+    // Bot o'yinlari uchun alohida reyting (online = rating, bot = bot_rating)
+    tryExec("ALTER TABLE `users` ADD COLUMN `bot_rating` INT NOT NULL DEFAULT 1000", "users.bot_rating");
+
+    // ---- matches: durang so'rovi ustuni ----
+    tryExec("ALTER TABLE `matches` ADD COLUMN `draw_offer` TINYINT NOT NULL DEFAULT 0", "matches.draw_offer");
+
+    // ---- match_chat (o'yin ichida chat) ----
+    tryExec("
+        CREATE TABLE IF NOT EXISTS `match_chat` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `match_id` BIGINT UNSIGNED NOT NULL,
+            `user_id` BIGINT UNSIGNED NOT NULL,
+            `text` VARCHAR(200) NOT NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_match` (`match_id`, `id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ", "match_chat jadvali");
+
+    // ---- tournaments (kunlik/haftalik/oylik) ----
+    tryExec("
+        CREATE TABLE IF NOT EXISTS `tournaments` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `type` ENUM('daily','weekly','monthly') NOT NULL,
+            `title` VARCHAR(60) NOT NULL,
+            `starts_at` DATETIME NOT NULL,
+            `ends_at` DATETIME NOT NULL,
+            `status` ENUM('active','finished') NOT NULL DEFAULT 'active',
+            `prize1` INT NOT NULL DEFAULT 0,
+            `prize2` INT NOT NULL DEFAULT 0,
+            `prize3` INT NOT NULL DEFAULT 0,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_period` (`type`, `starts_at`),
+            KEY `idx_status` (`status`, `ends_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ", "tournaments jadvali");
+
+    tryExec("
+        CREATE TABLE IF NOT EXISTS `tournament_players` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `tournament_id` BIGINT UNSIGNED NOT NULL,
+            `user_id` BIGINT UNSIGNED NOT NULL,
+            `score` INT NOT NULL DEFAULT 0,
+            `joined_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_tp` (`tournament_id`, `user_id`),
+            KEY `idx_score` (`tournament_id`, `score`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ", "tournament_players jadvali");
+
     echo "<h3 style='color:green'>Tayyor! O'rnatish muvaffaqiyatli.</h3>";
     echo "<p>1) <b>install.php</b> faylini o'chiring (xavfsizlik).</p>";
     echo "<p>2) Webhook: <a href='set_webhook.php?do=set'>set_webhook.php?do=set</a></p>";

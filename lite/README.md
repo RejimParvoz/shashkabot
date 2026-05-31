@@ -43,16 +43,20 @@ oddiy hostingda muammosiz ishlaydi.
 
 ## ✅ Nima ishlaydi
 
-- **Telegram avto-login** — initData HMAC tekshiruvi bilan avtomatik kirish.
+- **Animatsiyali kirish logotipi** (SVG) va yuklash ekrani.
+- **Telegram avto-login** — initData HMAC tekshiruvi.
 - **To'g'ri o'zbek/rus shashka qoidalari** — orqaga olish + uchuvchi dama, majburiy yutish, zanjir.
-- **Bot bilan o'ynash** — 4 daraja, Minimax+Alpha-Beta AI.
-- **🌐 Online o'ynash** — tasodifiy raqib (server tomon tekshiruvli).
-- **👥 Do'st bilan 1v1** — havola/kod yarating, do'stga yuboring; u kirsa o'yin boshlanadi.
-- **🏪 Do'kon** — tanga terilari + **💎 premium (olmos) skinlar** (marmar, galaktika, olmos, yoqut, shohona...).
-- **💎 Olmos sotib olish** — Telegram Stars orqali (5 paket).
-- **🎟 Battle Pass** — 10 daraja, free + premium track, XP (o'yin +10, g'alaba +25), mukofotlar.
-- **🏆 Reyting + podium** — 1-o'rin markazda, 2-chapda, 3-o'ngda; o'yinchi ustiga bossangiz to'liq statistika.
-- **🎁 Do'st taklif (referral)** — botga havola; taklif qilgan +200🪙, yangi +100🪙.
+- **Bot bilan o'ynash** — 4 daraja, Minimax+Alpha-Beta AI. **Alohida bot reytingi.**
+- **🌐 Online o'ynash** — tasodifiy raqib. **Alohida online reyting.**
+- **👥 Do'st bilan 1v1** — havola/kod (bot orqali), do'st kirsa o'yin boshlanadi.
+- **💬 O'yin chati** — online o'yinda yozishish, tezkor emojilar.
+- **🤝 Durang so'rovi** — online o'yinda taklif qilish/qabul qilish.
+- **🔊 Ovoz effektlari** — yurish, yutish, g'alaba, chat (Web Audio API, o'chirish mumkin).
+- **🏆 Turnirlar** — kunlik/haftalik/oylik, ochko (g'alaba +3), top 3 olmos yutadi, jonli sanoq.
+- **🏪 Do'kon** — tanga terilari + **💎 premium skinlar** (maxsus SVG grafika, canvas'da porlash).
+- **💎 Olmos sotib olish** + **🎟 Battle Pass** + **👑 VIP** (3 daraja, kunlik olmos bonusi) — Telegram Stars.
+- **🏆 Reyting + podium** — 1 markazda, 2 chapda, 3 o'ngda; o'yinchi ustiga bossangiz to'liq statistika.
+- **🎁 Referral** — botga havola; +200🪙 / +100🪙.
 - **To'liq iOS style** — glassmorphism, segment, blur, dark/light.
 
 ## 🧪 Testlar (47)

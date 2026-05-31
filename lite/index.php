@@ -112,10 +112,26 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--card);padding:13px 18px;
   border-radius:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:100;display:none;font-size:14px;font-weight:600;max-width:90%;}
 .toast.show{display:block;animation:fade .2s;}
-.loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:16px;z-index:200;}
+.loader{position:fixed;inset:0;background:radial-gradient(circle at 50% 35%,rgba(10,132,255,.12),var(--bg) 70%);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;z-index:200;}
 .spin{width:36px;height:36px;border:3px solid var(--sep);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;}
 @keyframes sp{to{transform:rotate(360deg);}}
+.logo{animation:logoPop .7s cubic-bezier(.2,1.2,.3,1);}
+.logo-svg{display:block;}
+.logo-ring{transform-origin:60px 60px;animation:ringSpin 3.5s linear infinite;}
+.logo-king{transform-origin:60px 60px;animation:kingFloat 2s ease-in-out infinite;}
+.logo-dots circle{animation:dotPulse 2s ease-in-out infinite;}
+.logo-title{font-size:30px;font-weight:800;letter-spacing:4px;margin-top:14px;
+  background:linear-gradient(135deg,#0a84ff,#5e5ce6);-webkit-background-clip:text;background-clip:text;color:transparent;animation:fadeUp .6s .2s both;}
+.logo-sub{font-size:13px;font-weight:700;letter-spacing:3px;color:var(--gold);animation:fadeUp .6s .35s both;}
+.logo-bar{width:140px;height:5px;border-radius:3px;background:var(--sep);overflow:hidden;margin-top:18px;}
+.logo-bar-fill{height:100%;width:30%;border-radius:3px;background:linear-gradient(90deg,#0a84ff,#5e5ce6);animation:loadBar 1.4s ease-in-out infinite;}
+@keyframes logoPop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+@keyframes ringSpin{to{transform:rotate(360deg);}}
+@keyframes kingFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-4px) scale(1.06);}}
+@keyframes dotPulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+@keyframes loadBar{0%{transform:translateX(-120%);}100%{transform:translateX(420%);}}
 .matchwait{text-align:center;padding:40px 20px;}
 .progress{height:10px;background:rgba(118,118,128,.18);border-radius:6px;overflow:hidden;}
 .progress-fill{height:100%;background:linear-gradient(90deg,#0a84ff,#5e5ce6);border-radius:6px;transition:width .4s;}
@@ -135,11 +151,80 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
 .pod .rt{font-size:12px;font-weight:800;color:var(--accent);}
 .pod .base{border-radius:10px 10px 0 0;background:linear-gradient(180deg,#0a84ff,#5e5ce6);color:#fff;font-weight:800;width:72px;display:flex;align-items:center;justify-content:center;}
 .pod1 .base{height:64px;font-size:26px;}.pod2 .base{height:44px;font-size:20px;}.pod3 .base{height:30px;font-size:18px;}
+.loader.hide{opacity:0;pointer-events:none;transition:opacity .45s;}
+/* Chat */
+.chat{margin:10px 16px;background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06);}
+.chat-msgs{max-height:160px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;}
+.cmsg{max-width:78%;padding:7px 11px;border-radius:14px;font-size:14px;word-break:break-word;}
+.cmsg.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
+.cmsg.them{align-self:flex-start;background:rgba(118,118,128,.16);border-bottom-left-radius:4px;}
+.chat-input{display:flex;gap:6px;padding:8px;border-top:.5px solid var(--sep);}
+.chat-input input{flex:1;padding:9px 12px;border-radius:18px;border:1px solid var(--sep);background:var(--bg);color:var(--text);font-size:14px;}
+.chat-input button{width:40px;border-radius:50%;background:var(--accent);color:#fff;font-size:16px;}
+.chat-quick{display:flex;gap:6px;flex-wrap:wrap;padding:0 8px 8px;}
+.chat-quick span{padding:5px 10px;border-radius:14px;background:rgba(118,118,128,.16);font-size:16px;cursor:pointer;}
+/* Tournament */
+.tcard{background:var(--card);border-radius:16px;padding:15px;margin:9px 16px;box-shadow:0 1px 6px rgba(0,0,0,.06);}
+.tcard .th{display:flex;justify-content:space-between;align-items:center;}
+.tcard .tt{font-weight:800;font-size:17px;}
+.tcard .tm{font-size:12px;color:var(--muted);margin-top:2px;}
+.tprizes{display:flex;gap:8px;margin:10px 0;}
+.tprize{flex:1;text-align:center;background:rgba(118,118,128,.1);border-radius:10px;padding:7px 4px;font-size:13px;font-weight:700;}
+.tprize.g1{background:rgba(255,214,10,.16);}.tprize.g2{background:rgba(174,179,189,.16);}.tprize.g3{background:rgba(205,127,50,.16);}
+.ttop{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:.5px solid var(--sep);font-size:14px;}
+.ttop .r{width:22px;font-weight:800;text-align:center;}
+.ttop .nm{flex:1;}
+.ttop .sc{font-weight:800;color:var(--accent);}
+.countdown{font-variant-numeric:tabular-nums;font-weight:700;color:var(--danger);}
+/* VIP */
+.vipcard{background:linear-gradient(135deg,#1c1c2e,#3a2b6b);color:#fff;border-radius:16px;padding:16px;margin:9px 16px;position:relative;overflow:hidden;}
+.vipcard.bronze{background:linear-gradient(135deg,#5a3a1a,#8a5a2a);}
+.vipcard.gold{background:linear-gradient(135deg,#7a5c00,#ffd60a);color:#1c1c1e;}
+.vipcard.platinum{background:linear-gradient(135deg,#3a3a4a,#aeb3bd);color:#1c1c1e;}
+.vipcard .vt{font-weight:800;font-size:18px;}
+.vipcard .vd{font-size:13px;opacity:.9;margin:4px 0 12px;}
+.vip-badge-crown{display:inline-block;}
+/* Premium shop shine */
+.shop-item.prem{box-shadow:0 0 0 1.5px var(--gold),0 2px 10px rgba(255,214,10,.18);}
+.shop-item.prem::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:shine 3s infinite;}
+@keyframes shine{0%,60%{left:-60%;}100%{left:130%;}}
+.shop-prev svg{display:block;}
 </style>
 </head>
 <body>
 
-<div class="loader" id="loader"><div style="font-size:34px;">🎯</div><div class="spin"></div><div class="muted">Yuklanmoqda...</div></div>
+<div class="loader" id="loader">
+  <div class="logo">
+    <svg class="logo-svg" viewBox="0 0 120 120" width="110" height="110">
+      <defs>
+        <linearGradient id="lgBoard" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#5e5ce6"/>
+        </linearGradient>
+        <radialGradient id="lgPiece" cx="0.35" cy="0.3" r="0.8">
+          <stop offset="0" stop-color="#fff6d0"/><stop offset="0.5" stop-color="#ffd60a"/><stop offset="1" stop-color="#b8860b"/>
+        </radialGradient>
+        <filter id="lgGlow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect class="logo-ring" x="6" y="6" width="108" height="108" rx="26" fill="none" stroke="url(#lgBoard)" stroke-width="4" stroke-dasharray="60 30"/>
+      <rect x="22" y="22" width="76" height="76" rx="16" fill="url(#lgBoard)" opacity="0.16"/>
+      <!-- checker dots -->
+      <g class="logo-dots" fill="#0a84ff">
+        <circle cx="38" cy="38" r="5"/><circle cx="60" cy="38" r="5" opacity="0.4"/><circle cx="82" cy="38" r="5"/>
+        <circle cx="38" cy="60" r="5" opacity="0.4"/><circle cx="82" cy="60" r="5" opacity="0.4"/>
+        <circle cx="38" cy="82" r="5"/><circle cx="60" cy="82" r="5" opacity="0.4"/><circle cx="82" cy="82" r="5"/>
+      </g>
+      <!-- center king -->
+      <g class="logo-king" filter="url(#lgGlow)">
+        <circle cx="60" cy="60" r="20" fill="url(#lgPiece)"/>
+        <text x="60" y="67" font-size="22" text-anchor="middle" fill="#7a5c00" font-family="serif">&#9819;</text>
+      </g>
+    </svg>
+  </div>
+  <div class="logo-title">SHASHKA</div>
+  <div class="logo-sub">Pro</div>
+  <div class="logo-bar"><div class="logo-bar-fill"></div></div>
+</div>
 
 <div class="hdr">
   <div class="u"><img class="avatar" id="uAvatar" src=""><div><div id="uName" style="font-weight:700;">Mehmon</div><div class="muted">⭐ <span id="uRating">1000</span></div></div></div>
@@ -154,6 +239,10 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <h1>Salom! 👋</h1>
   <div style="padding:0 16px;"><button class="btn grad" onclick="findOnline()">🌐 Online o'ynash</button></div>
   <div style="padding:8px 16px;"><button class="btn sec" onclick="openFriend()">👥 Do'st bilan 1v1</button></div>
+  <div class="grid2" style="margin-top:4px;">
+    <div class="mode" onclick="nav('tour')"><div class="e">🏆</div><div class="n">Turnirlar</div><div class="t">Kunlik/Haftalik</div></div>
+    <div class="mode" onclick="nav('vip')"><div class="e">👑</div><div class="n">VIP</div><div class="t">Imtiyozlar</div></div>
+  </div>
   <h2>Bot bilan o'ynash</h2>
   <div class="seg" id="levelSeg">
     <button data-l="easy" onclick="setLevel('easy',this)">Oson</button>
@@ -173,7 +262,20 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <div class="board-wrap"><canvas id="board" width="430" height="430"></canvas></div>
   <div class="turn" id="turn">Sizning navbatingiz</div>
   <div class="pbar act" id="meBar"><div class="nm"><span class="dot on"></span><span id="meName">😎 Siz</span></div><div id="myCount">12</div></div>
-  <div style="padding:0 16px;"><button class="btn danger" onclick="resignCurrent()">🏳️ Taslim bo'lish</button></div>
+  <div class="row" style="padding:0 16px;gap:8px;">
+    <button class="btn sec hidden" id="drawBtn" onclick="offerDraw()">🤝 Durang</button>
+    <button class="btn sec hidden" id="chatBtn" onclick="toggleChat()">💬 Chat</button>
+    <button class="btn danger" onclick="resignCurrent()">🏳️ Taslim</button>
+  </div>
+  <!-- Chat paneli (online) -->
+  <div class="chat hidden" id="chatPanel">
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="chat-input">
+      <input id="chatText" maxlength="200" placeholder="Xabar..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()">➤</button>
+    </div>
+    <div class="chat-quick" id="chatQuick"></div>
+  </div>
 </div>
 
 <!-- SHOP -->
@@ -199,6 +301,24 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <div id="bpLevels"></div>
 </div>
 
+<!-- TOURNAMENTS -->
+<div class="page" id="p-tour">
+  <h1>🏆 Turnirlar</h1>
+  <p class="muted" style="padding:0 18px 6px;">G'alaba +3, durang +1 ochko. Top 3 olmos yutadi!</p>
+  <div id="tourList"><div class="muted" style="padding:16px;">Yuklanmoqda...</div></div>
+</div>
+
+<!-- VIP -->
+<div class="page" id="p-vip">
+  <h1>👑 VIP</h1>
+  <div class="card" id="vipStatus" style="text-align:center;">
+    <div class="muted">Holat yuklanmoqda...</div>
+  </div>
+  <h2>Rejalar</h2>
+  <div id="vipPlans"></div>
+  <p class="muted" style="padding:10px 18px;">VIP imtiyozlari: kunlik olmos bonusi, profilda 👑 belgi, premium qo'llab-quvvatlash.</p>
+</div>
+
 <!-- LEADERBOARD -->
 <div class="page" id="p-top">
   <h1>🏆 Reyting</h1>
@@ -211,8 +331,18 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
   <h1>👤 Profil</h1>
   <div class="card" style="text-align:center;">
     <img class="avatar" id="pAvatar" style="width:84px;height:84px;margin:0 auto 10px;" src="">
-    <h3 id="pName" style="font-size:19px;">Mehmon</h3>
-    <div class="muted">⭐ <b id="pRating">1000</b> • #<span id="pRank">-</span></div>
+    <h3 id="pName" style="font-size:19px;"><span id="pVip"></span>Mehmon</h3>
+    <div class="muted">#<span id="pRank">-</span></div>
+    <div class="row" style="gap:10px;margin-top:12px;">
+      <div style="flex:1;background:rgba(118,118,128,.1);border-radius:12px;padding:10px;">
+        <div style="font-weight:800;font-size:20px;">🌐 <span id="pRating">1000</span></div>
+        <div class="muted">Online reyting</div>
+      </div>
+      <div style="flex:1;background:rgba(118,118,128,.1);border-radius:12px;padding:10px;">
+        <div style="font-weight:800;font-size:20px;">🤖 <span id="pBotRating">1000</span></div>
+        <div class="muted">Bot reyting</div>
+      </div>
+    </div>
   </div>
   <div class="card">
     <div class="stat"><span>🎮 O'yinlar</span><b id="pGames">0</b></div>
@@ -224,7 +354,10 @@ h2{font-size:17px;font-weight:700;padding:14px 18px 8px;letter-spacing:-.2px;}
     <div class="stat"><span>👥 Takliflar</span><b id="pRefs">0</b></div>
   </div>
   <div style="padding:0 16px;"><button class="btn gold" onclick="inviteFriend()">🎁 Do'st taklif qilish (+200🪙)</button></div>
-  <div style="padding:8px 16px;"><button class="btn sec" onclick="toggleTheme()">🌙 Tema</button></div>
+  <div class="row" style="padding:8px 16px;gap:10px;">
+    <button class="btn sec" onclick="toggleTheme()">🌙 Tema</button>
+    <button class="btn sec" id="sndBtn" onclick="toggleSound()">🔊 Ovoz</button>
+  </div>
 </div>
 
 <div class="nav">
