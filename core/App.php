@@ -223,6 +223,9 @@ class App {
             
             // Telegram webhook
             $router->post('/telegram/webhook', 'Api\\TelegramController@webhook');
+
+            // Health check (routing + bootstrap diagnostic)
+            $router->get('/health', 'PageController@health');
         });
         
         // Admin Routes

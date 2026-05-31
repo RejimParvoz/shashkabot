@@ -16,6 +16,24 @@ class PageController extends Controller {
     }
 
     /**
+     * Health check endpoint - confirms routing + bootstrap work.
+     * GET /api/health  ->  https://topkons.uz/shashka/api/health
+     */
+    public function health($params = []) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(200);
+        echo json_encode([
+            'success' => true,
+            'status' => 'ok',
+            'service' => 'Shashka Game API',
+            'routing' => 'working',
+            'php_version' => PHP_VERSION,
+            'time' => date('c')
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
      * Game page
      */
     public function game($params = []) {
